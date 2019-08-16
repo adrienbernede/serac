@@ -1,7 +1,6 @@
 blt_add_executable( NAME serac
                     SOURCES serac.cpp
-                    DEPENDS_ON mpi mfem hypre blas lapack 
-                    solvers coefficients
+                    DEPENDS_ON solvers coefficients mpi mfem hypre blas lapack ZLIB::ZLIB
                     )
 
 install( TARGETS serac
