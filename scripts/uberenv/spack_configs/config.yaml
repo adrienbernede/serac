@@ -16,17 +16,19 @@
 config:
   # This is the path to the root of the Spack install tree.
   # You can use $spack here to refer to the root of the spack instance.
-  install_tree: $spack/opt/spack
+  install_tree: $spack/..
 
   # Locations where templates should be found
   template_dirs:
     - $spack/templates
 
+  # install directory layout
+  install_path_scheme: "${COMPILERNAME}-${COMPILERVER}/${PACKAGE}-${VERSION}"
+
   # Locations where different types of modules should be installed.
   module_roots:
     tcl:    $spack/share/spack/modules
     lmod:   $spack/share/spack/lmod
-
 
   # Temporary locations Spack can try to use for builds.
   #

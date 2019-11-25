@@ -1,5 +1,6 @@
 {
-"package_name" : "serac",
+"package_name" : "serac_libraries",
+"uberenv_package_name" : "serac_libraries",
 "spack_url": "https://github.com/spack/spack",
 "spack_branch": "develop",
 "spack_activate" : {}
