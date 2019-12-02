@@ -15,7 +15,7 @@ macro(serac_add_code_checks)
          "${options}" "${singleValueArgs}" "${multiValueArgs}" ${ARGN})
 
     set(_all_sources)
-    file(GLOB_RECURSE _all_sources ${BLT_C_FILE_EXTS})
+    file(GLOB_RECURSE _all_sources "*.cpp" "*.hpp")
 
     # Check for excludes
     if (NOT DEFINED arg_EXCLUDES)
