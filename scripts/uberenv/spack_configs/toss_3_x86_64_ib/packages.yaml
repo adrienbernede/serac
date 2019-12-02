@@ -5,13 +5,6 @@ packages:
       blas: [openblas]
       lapack: [openblas]
       mpi: [mvapich2]
-  cmake:
-    version: [3.9.6]
-    variants: ~openssl~ncurses
-  pkg-config:
-      buildable: False
-      paths:
-          pkg-config: /usr
   mvapich2:
     paths:
       # clang mvapich2

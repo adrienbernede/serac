@@ -101,6 +101,11 @@ def parse_args():
                       dest="spec",
                       default=None,
                       help="spack compiler spec")
+    # optional Spack package to build, defaults to values in project.json
+    parser.add_option("--package",
+                      dest="package",
+                      default="",
+                      help="Spack package to build (defaults to package_name in project.json)")
     # optional location of spack mirror
     parser.add_option("--mirror",
                       dest="mirror",
@@ -208,7 +213,9 @@ class UberEnv():
         print("[uberenv options: {}]".format(str(self.opts)))
 
         # setup main package name
-        if opts["install"]:
+        if opts["package"]:
+            self.pkg_name = self.project_opts["package"]
+        elif opts["install"]:
             self.pkg_name = self.project_opts["package_name"]
         else:
             self.pkg_name = self.project_opts["uberenv_package_name"]

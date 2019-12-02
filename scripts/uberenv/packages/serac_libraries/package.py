@@ -43,31 +43,40 @@ def cmake_cache_option(name, boolean_value, comment=""):
 
 
 def get_spec_path(spec, package_name, path_replacements = {}, use_bin = False) :
-    """Extracts the prefix path for the given spack package
-       path_replacements is a dictionary with string replacements for the path.
-    """
+    """Extracts the prefix path for the given spack package"""
 
     if not use_bin:
         path = spec[package_name].prefix
     else:
         path = spec[package_name].prefix.bin
+    path = path_replace(path, path_replacements)
+    return path
 
+
+def path_replace(path, path_replacements):
+    """Replaces path key/value pairs from paht_replacements in path"""
     for key in path_replacements:
         path = path.replace(key,path_replacements[key])
-
     return path
+
 
 class SeracLibraries(Package):
     """This is a set of libraries necessary for the developers of Serac.
        It also generates a host-config to be used for building Serac."""
+
+    # TODO: Change this to a Spack BundledPackage that creates the host-config
+    #       or change the git to be Serac's repo when it is on github
+
     #git = "ssh://git@cz-bitbucket.llnl.gov:7999/ser/serac.git"
     git = "https://github.com/LLNL/blt.git"
 
     version('develop', branch='develop', submodules=True, preferred=True)
 
     # List of Serac's third-party library dependencies
-    depends_on('mfem +superlu-dist')
-
+    depends_on('mfem +superlu-dist~shared')
+    depends_on('superlu-dist~shared')
+    depends_on('parmetis~shared')
+    depends_on('metis~shared')
 
     def install(self, spec, prefix):
 
@@ -94,27 +103,34 @@ class SeracLibraries(Package):
         ##############################################
 
         cmake_exe = spec['cmake'].command.path
-        compiler_string = str(spec.compiler).strip('%').replace('@','_').replace('.','_')
-        host_cfg_fname = "%s__%s__serac.cmake" % (sys_type,
-                                                  compiler_string)
+        compiler_string = str(spec.compiler).strip('%')
+        host_config_filename = "{0}.cmake".format(compiler_string)
+        host_config_path = os.path.abspath(os.path.join(env["SPACK_DEBUG_LOG_DIR"], host_config_filename))
 
-        cfg = open(host_cfg_fname, "w")
-        cfg.write("##################################\n")
-        cfg.write("# Spack generated host-config\n")
-        cfg.write("##################################\n")
-        cfg.write("# {0}-{1}\n".format(sys_type, spec.compiler))
-        cfg.write("##################################\n\n")
+        cfg = open(host_config_path, "w")
+        cfg.write("####################################################################\n")
+        cfg.write("# Generated host-config - Edit at own risk!\n")
+        cfg.write("####################################################################\n")
+        cfg.write("# Copyright (c) 2019, Lawrence Livermore National Security, LLC and\n")
+        cfg.write("# other Serac Project Developers. See the top-level LICENSE file for\n")
+        cfg.write("# details.\n")
+        cfg.write("#\n")
+        cfg.write("# SPDX-License-Identifier: (BSD-3-Clause) \n")
+        cfg.write("####################################################################\n\n")
 
-        # Include path to cmake for reference
-        cfg.write("# cmake executable path: %s\n\n" % cmake_exe)
+        cfg.write("#---------------------------------------\n")
+        cfg.write("# SYS_TYPE: {0}\n".format(sys_type))
+        cfg.write("# Compiler Spec: {0}\n".format(spec.compiler))
+        cfg.write("# CMake executable path: %s\n" % cmake_exe)
+        cfg.write("#---------------------------------------\n\n")
 
         #######################
         # Compiler Settings
         #######################
 
-        cfg.write("#######\n")
-        cfg.write("# Using %s compiler spec\n" % spec.compiler)
-        cfg.write("#######\n\n")
+        cfg.write("#---------------------------------------\n")
+        cfg.write("# Compilers\n")
+        cfg.write("#---------------------------------------\n")
         cfg.write(cmake_cache_entry("CMAKE_C_COMPILER", c_compiler))
         cfg.write(cmake_cache_entry("CMAKE_CXX_COMPILER", cpp_compiler))
 
@@ -122,6 +138,9 @@ class SeracLibraries(Package):
         # MPI
         #######################
 
+        cfg.write("#---------------------------------------\n")
+        cfg.write("# MPI\n")
+        cfg.write("#---------------------------------------\n")
         cfg.write(cmake_cache_entry("ENABLE_MPI", "ON"))
         cfg.write(cmake_cache_entry("MPI_C_COMPILER", spec['mpi'].mpicc))
         cfg.write(cmake_cache_entry("MPI_CXX_COMPILER",
@@ -141,6 +160,10 @@ class SeracLibraries(Package):
         # Adding dependencies
         #######################
 
+        cfg.write("#---------------------------------------\n")
+        cfg.write("# Library Dependencies\n")
+        cfg.write("#---------------------------------------\n")
+
         path_replacements = {}
 
         # Try to find the common prefix of the TPL directory, including the compiler
@@ -148,9 +171,8 @@ class SeracLibraries(Package):
         compiler_str = str(spec.compiler).replace('@','-')
         prefix_paths = prefix.split( compiler_str )
         if len(prefix_paths) == 2:
-            tpl_root = pjoin( prefix_paths[0], compiler_str )
+            tpl_root = os.path.join( prefix_paths[0], compiler_str )
             path_replacements[tpl_root] = "${TPL_ROOT}"
-            cfg.write("# Root directory for generated TPLs\n")
             cfg.write(cmake_cache_entry("TPL_ROOT",tpl_root))
 
         mfem_dir = get_spec_path(spec, "mfem", path_replacements)
@@ -160,31 +182,37 @@ class SeracLibraries(Package):
         # Adding developer tools
         #######################
 
-        cfg.write("#######\n")
-        cfg.write("# Developer tools\n")
-        cfg.write("#######\n\n")
+        cfg.write("#---------------------------------------\n")
+        cfg.write("# Developer Tools\n")
+        cfg.write("#---------------------------------------\n")
 
-        #TODO: this should be in a common location
+        #TODO: Change this to the common location (/usr/WS1/smithdev/tools) when thats available
         devtools_root = "/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0"
         path_replacements[devtools_root] = "${DEVTOOLS_ROOT}"
         cfg.write(cmake_cache_entry("DEVTOOLS_ROOT", devtools_root))
 
-        #TODO: Can this come from a upstream
-        cfg.write(cmake_cache_entry("ASTYLE_EXECUTABLE", "/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/astyle-3.1/bin/astyle"))
-        cfg.write(cmake_cache_entry("CPPCHECK_EXECUTABLE", "/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/cppcheck-1.87/bin/cppcheck"))
-        cfg.write(cmake_cache_entry("DOXYGEN_EXECUTABLE", "/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/doxygen-1.8.15/bin/doxygen"))
-        cfg.write(cmake_cache_entry("SPHINX_EXECUTABLE", "/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/py-sphinx-2.2.0/bin/sphinx-build"))
+        #TODO: This path should be able to come from a Spack upstream when they aren't tied to a spec
+        astyle_path = path_replace("/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/astyle-3.1/bin/astyle", path_replacements)
+        cfg.write(cmake_cache_entry("ASTYLE_EXECUTABLE", astyle_path))
+
+        cppcheck_path = path_replace("/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/cppcheck-1.87/bin/cppcheck", path_replacements)
+        cfg.write(cmake_cache_entry("CPPCHECK_EXECUTABLE", cppcheck_path))
+
+        doxygen_path = path_replace("/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/doxygen-1.8.15/bin/doxygen", path_replacements)
+        cfg.write(cmake_cache_entry("DOXYGEN_EXECUTABLE", doxygen_path))
+
+        sphinx_path = path_replace("/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/py-sphinx-2.2.0/bin/sphinx-build", path_replacements)
+        cfg.write(cmake_cache_entry("SPHINX_EXECUTABLE", sphinx_path))
 
 
         #######################
-        # Close host-config
+        # Close and save
         #######################
-
-        cfg.write("##################################\n")
-        cfg.write("# End Spack generated host-config\n")
-        cfg.write("##################################\n")
+        cfg.write("\n")
         cfg.close()
 
-        host_cfg_fname = os.path.abspath(host_cfg_fname)
-        tty.info("Spack generated Serac host-config file: " + host_cfg_fname)
+        # Fake install something so Spack doesn't complain
+        mkdirp(prefix)
+        install(host_config_path, prefix)
+        print("Spack generated Serac host-config file: {0}".format(host_config_path))
 

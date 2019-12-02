@@ -45,6 +45,8 @@ class SuperluDist(CMakePackage):
 
     def cmake_args(self):
         spec = self.spec
+        ## BEGIN SERAC EDIT
+        #  Added metis include path to TPL_PARMETIS_INCLUDE_DIRS
         args = [
             '-DCMAKE_C_COMPILER=%s' % spec['mpi'].mpicc,
             '-DCMAKE_CXX_COMPILER=%s' % spec['mpi'].mpicxx,
@@ -57,6 +59,7 @@ class SuperluDist(CMakePackage):
             '-DTPL_PARMETIS_INCLUDE_DIRS=%s' % spec['parmetis'].prefix.include +
             ';' + spec['metis'].prefix.include
         ]
+        ## END SERAC EDIT
 
         if (spec.satisfies('%xl') or spec.satisfies('%xl_r')) and \
            spec.satisfies('@:6.1.1'):
