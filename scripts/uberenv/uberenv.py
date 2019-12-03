@@ -214,7 +214,7 @@ class UberEnv():
 
         # setup main package name
         if opts["package"]:
-            self.pkg_name = self.project_opts["package"]
+            self.pkg_name = opts["package"]
         elif opts["install"]:
             self.pkg_name = self.project_opts["package_name"]
         else:
