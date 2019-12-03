@@ -170,6 +170,7 @@ class SeracLibraries(Package):
         # If found, we will use this in the TPL paths
         compiler_str = str(spec.compiler).replace('@','-')
         prefix_paths = prefix.split( compiler_str )
+        tpl_root = ""
         if len(prefix_paths) == 2:
             tpl_root = os.path.join( prefix_paths[0], compiler_str )
             path_replacements[tpl_root] = "${TPL_ROOT}"
@@ -182,28 +183,28 @@ class SeracLibraries(Package):
         # Adding developer tools
         #######################
 
-        cfg.write("#---------------------------------------\n")
-        cfg.write("# Developer Tools\n")
-        cfg.write("#---------------------------------------\n")
-
         #TODO: Change this to the common location (/usr/WS1/smithdev/tools) when thats available
-        devtools_root = "/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0"
-        path_replacements[devtools_root] = "${DEVTOOLS_ROOT}"
-        cfg.write(cmake_cache_entry("DEVTOOLS_ROOT", devtools_root))
+        devtools_root = os.path.dirname(os.path.dirname(tpl_root))
+        devtools_root = os.path.join(devtools_root, "devtools")
 
-        #TODO: This path should be able to come from a Spack upstream when they aren't tied to a spec
-        astyle_path = path_replace("/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/astyle-3.1/bin/astyle", path_replacements)
-        cfg.write(cmake_cache_entry("ASTYLE_EXECUTABLE", astyle_path))
+        if os.path.exists(devtools_root):
+            cfg.write("#---------------------------------------\n")
+            cfg.write("# Developer Tools\n")
+            cfg.write("#---------------------------------------\n")
 
-        cppcheck_path = path_replace("/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/cppcheck-1.87/bin/cppcheck", path_replacements)
-        cfg.write(cmake_cache_entry("CPPCHECK_EXECUTABLE", cppcheck_path))
+            #TODO: These paths should be able to come from a Spack upstream when they aren't tied to a spec
+            astyle_path = "${DEVTOOLS_ROOT}/gcc-7.3.0/astyle-3.1/bin/astyle"
+            cfg.write(cmake_cache_entry("ASTYLE_EXECUTABLE", astyle_path))
 
-        doxygen_path = path_replace("/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/doxygen-1.8.15/bin/doxygen", path_replacements)
-        cfg.write(cmake_cache_entry("DOXYGEN_EXECUTABLE", doxygen_path))
+            cppcheck_path = "${DEVTOOLS_ROOT}/gcc-7.3.0/cppcheck-1.87/bin/cppcheck"
+            cfg.write(cmake_cache_entry("CPPCHECK_EXECUTABLE", cppcheck_path))
 
-        sphinx_path = path_replace("/usr/WS2/white238/serac/repo/devtools/gcc-7.3.0/py-sphinx-2.2.0/bin/sphinx-build", path_replacements)
-        cfg.write(cmake_cache_entry("SPHINX_EXECUTABLE", sphinx_path))
+            doxygen_path = "${DEVTOOLS_ROOT}/gcc-7.3.0/doxygen-1.8.15/bin/doxygen"
+            cfg.write(cmake_cache_entry("DOXYGEN_EXECUTABLE", doxygen_path))
 
+            sphinx_path = "${DEVTOOLS_ROOT}/gcc-7.3.0/py-sphinx-2.2.0/bin/sphinx-build"
+            cfg.write(cmake_cache_entry("SPHINX_EXECUTABLE", sphinx_path))
+        endif()
 
         #######################
         # Close and save

@@ -17,15 +17,25 @@ using Uberenv. This will download and configure Spack and build all of Serac's d
 generates a host-config file that has all the necessary build information for Serac. The CMake
 configuration phase has also been encapsulated in config-build.py.
 
-Here is an example of how to build Serac with clang 4.0.0:
+If you want the optional developer tools, run the following command:
 
-1. `scripts/uberenv/uberenv.py --prefix=<library build directory> --spec=%clang@4.0.0`
+```
+`scripts/uberenv/uberenv.py --package=serac_devtools --prefix=`pwd`/../devtools --spec=%clang@4.0.0`
+```
+
+This will enable Doxygen, Sphinx, Cppcheck, and AStyle in your build.  This is not required.
+
+Here is an example of how to build Serac and its build dependencies with clang 4.0.0:
+
+1. `scripts/uberenv/uberenv.py --prefix=`pwd`/../libs --spec=%clang@4.0.0`
 2. `./config-build.py -hc <library build directory>/clang@4.0.0.cmake`
 3. `cd build-<system-and-toolchain>`
 4. `cmake --build .`
 5. `ctest .`
 
-If you would like to use an existing installation of [MFEM](https://github.com/mfem/mfem/) (outside of Spack), you can write your own host-config file by following the examples in the host-configs directory and defining MFEM_DIR as well.
+If you would like to use an existing installation of [MFEM](https://github.com/mfem/mfem/)
+(outside of Spack), you can write your own host-config file by following the examples in the
+host-configs directory and defining MFEM_DIR as well.
 
 WARNING: The only MFEM build supported at the moment is the Makefile one (not the CMake one, yet).
 
