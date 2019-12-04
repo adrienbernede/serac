@@ -20,7 +20,7 @@ configuration phase has also been encapsulated in config-build.py.
 If you want the optional developer tools, run the following command:
 
 ```
-`scripts/uberenv/uberenv.py --package=serac_devtools --prefix=`pwd`/../devtools --spec=%clang@4.0.0`
+`scripts/uberenv/uberenv.py --package=serac_devtools --prefix=`pwd`/../devtools --spec=%gcc@8.1.0`
 ```
 
 This will enable Doxygen, Sphinx, Cppcheck, and AStyle in your build.  This is not required.

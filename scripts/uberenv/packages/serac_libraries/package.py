@@ -169,12 +169,12 @@ class SeracLibraries(Package):
         # Try to find the common prefix of the TPL directory, including the compiler
         # If found, we will use this in the TPL paths
         compiler_str = str(spec.compiler).replace('@','-')
-        prefix_paths = prefix.split( compiler_str )
+        prefix_paths = prefix.split(compiler_str)
         tpl_root = ""
         if len(prefix_paths) == 2:
             tpl_root = os.path.join( prefix_paths[0], compiler_str )
             path_replacements[tpl_root] = "${TPL_ROOT}"
-            cfg.write(cmake_cache_entry("TPL_ROOT",tpl_root))
+            cfg.write(cmake_cache_entry("TPL_ROOT", tpl_root))
 
         mfem_dir = get_spec_path(spec, "mfem", path_replacements)
         cfg.write(cmake_cache_entry("MFEM_DIR", mfem_dir))
@@ -184,27 +184,29 @@ class SeracLibraries(Package):
         #######################
 
         #TODO: Change this to the common location (/usr/WS1/smithdev/tools) when thats available
+        #TODO: Handle removing or globbing for the compiler version in path
         devtools_root = os.path.dirname(os.path.dirname(tpl_root))
-        devtools_root = os.path.join(devtools_root, "devtools")
+        devtools_root = os.path.join(devtools_root, "devtools", "gcc-8.1.0")
 
         if os.path.exists(devtools_root):
             cfg.write("#---------------------------------------\n")
             cfg.write("# Developer Tools\n")
             cfg.write("#---------------------------------------\n")
 
+            cfg.write(cmake_cache_entry("DEVTOOLS_ROOT", devtools_root))
+
             #TODO: These paths should be able to come from a Spack upstream when they aren't tied to a spec
-            astyle_path = "${DEVTOOLS_ROOT}/gcc-7.3.0/astyle-3.1/bin/astyle"
+            astyle_path = "${DEVTOOLS_ROOT}/astyle-3.1/bin/astyle"
             cfg.write(cmake_cache_entry("ASTYLE_EXECUTABLE", astyle_path))
 
-            cppcheck_path = "${DEVTOOLS_ROOT}/gcc-7.3.0/cppcheck-1.87/bin/cppcheck"
+            cppcheck_path = "${DEVTOOLS_ROOT}/cppcheck-1.87/bin/cppcheck"
             cfg.write(cmake_cache_entry("CPPCHECK_EXECUTABLE", cppcheck_path))
 
-            doxygen_path = "${DEVTOOLS_ROOT}/gcc-7.3.0/doxygen-1.8.15/bin/doxygen"
+            doxygen_path = "${DEVTOOLS_ROOT}/doxygen-1.8.15/bin/doxygen"
             cfg.write(cmake_cache_entry("DOXYGEN_EXECUTABLE", doxygen_path))
 
-            sphinx_path = "${DEVTOOLS_ROOT}/gcc-7.3.0/py-sphinx-2.2.0/bin/sphinx-build"
+            sphinx_path = "${DEVTOOLS_ROOT}/py-sphinx-2.2.0/bin/sphinx-build"
             cfg.write(cmake_cache_entry("SPHINX_EXECUTABLE", sphinx_path))
-        endif()
 
         #######################
         # Close and save
