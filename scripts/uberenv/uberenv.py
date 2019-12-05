@@ -234,7 +234,6 @@ def disable_spack_config_scopes(spack_dir):
     open(spack_lib_config,"w").write(cfg_script)
 
 
-
 def patch_spack(spack_dir,uberenv_dir,cfg_dir,pkgs):
     # force spack to use only defaults config scope
     disable_spack_config_scopes(spack_dir)
@@ -295,6 +294,7 @@ def find_spack_mirror(spack_dir, mirror_name):
             if parts[0] == mirror_name:
                 mirror_path = parts[1]
     return mirror_path
+
 
 def use_spack_mirror(spack_dir,
                      mirror_name,
@@ -400,11 +400,14 @@ def setup_osx_sdk_env_vars():
     print("[setting MACOSX_DEPLOYMENT_TARGET to {}]".format(env["MACOSX_DEPLOYMENT_TARGET"]))
     print("[setting SDKROOT to {}]".format(env[ "SDKROOT"]))
 
+
 def find_spack_pkg_path(pkg_name):
     r,rout = sexe("spack/bin/spack find -p " + pkg_name,ret_output = True)
     for l in rout.split("\n"):
-        if l.startswith(" "):
+        if l.startswith(pkg_name):
             return {"name": pkg_name, "path": l.split()[-1]}
+    print("[ERROR: failed to find package named '{}']".format(pkg_name))
+    sys.exit(-1)
 
 def find_spack_pkg_cache(pkg_name,spec):
     r,rout = sexe("spack/bin/spack location -s " + pkg_name + " " + spec,ret_output = True)
@@ -527,12 +530,8 @@ def main():
     cln_cmd = "spack/bin/spack clean "
     res = sexe(cln_cmd, echo=True)
 
-    # clean out any spack cached downloads
-    cln_cmd = "spack/bin/spack clean --downloads"
-    res = sexe(cln_cmd, echo=True)
-
-    # clean out spack misc cache
-    cln_cmd = "spack/bin/spack clean --misc-cache"
+    # clean out any spack cached stuff
+    cln_cmd = "spack/bin/spack clean --all"
     res = sexe(cln_cmd, echo=True)
 
     # check if we need to force uninstall of selected packages
