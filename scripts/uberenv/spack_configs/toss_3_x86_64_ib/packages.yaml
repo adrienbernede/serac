@@ -66,6 +66,16 @@ packages:
     paths:
       graphviz: /usr/
     buildable: False
-# Globally lock in version of CMake
+# Globally lock in version of packages
   cmake:
     version: [3.9.6]
+  mfem:
+    version: [4.0.0]
+  hypre:
+    version: [2.10.1]
+  superlu-dist:
+    version: [6.1.1]
+  parmetis:
+    version: [4.0.3]
+  metis:
+    version: [5.1.0]

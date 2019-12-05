@@ -73,11 +73,11 @@ class SeracLibraries(Package):
     version('develop', branch='develop', submodules=True, preferred=True)
 
     # List of Serac's third-party library dependencies
-    depends_on('mfem@4.0.0+superlu-dist~shared')
-    depends_on('hypre@2.16.0~shared')
-    depends_on('superlu-dist@6.1.1~shared')
-    depends_on('parmetis@4.0.3~shared')
-    depends_on('metis@5.1.0~shared')
+    depends_on('mfem +superlu-dist~shared')
+    depends_on('hypre~shared')
+    depends_on('superlu-dist~shared')
+    depends_on('parmetis~shared')
+    depends_on('metis~shared')
 
     def install(self, spec, prefix):
 
