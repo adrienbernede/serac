@@ -2,5 +2,6 @@
 "package_name" : "serac",
 "spack_url": "https://github.com/spack/spack",
 "spack_branch": "develop",
+"hostconfig_phase" : "hostconfig",
 "spack_activate" : {}
 }

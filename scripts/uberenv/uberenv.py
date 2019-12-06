@@ -431,12 +431,22 @@ def main():
     project_opts = load_json_file(opts["project_json"])
     uberenv_pkg_name = project_opts["package_name"]
 
+    try:
+        if project_opts["hostconfig_phase"]:
+            hostconfig_phase = project_opts["hostconfig_phase"]
+        else:
+            raise ValueError("hostconfig_phase cannot be empty.")
+
+    except (KeyError, ValueError) as e:
+        print("ERROR: hostconfig_phase must be defined in project.json")
+        raise
+
     dest_dir = os.path.abspath(opts["prefix"])
     base_dir = os.path.abspath(os.path.join(dest_dir, os.path.pardir))
     if opts["install"]:
         install_arg = "install "
     else:
-        install_arg = "dev-build -d {} -u configure ".format(base_dir)
+        install_arg = "dev-build -d {} -u {} ".format(base_dir,hostconfig_phase)
 
     print("[uberenv project settings: {}]".format(str(project_opts)))
     print("[uberenv options: {}]".format(str(opts)))
