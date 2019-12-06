@@ -68,9 +68,9 @@ packages:
     buildable: False
 # Globally lock in version of packages
   cmake:
-    version: [3.9.6]
+    version: [3.9.2]
     paths:
-      cmake: /usr/WS2/white238/serac/devtools/gcc-8.1.0/cmake-3.9.6
+      cmake: /usr/tce/packages/cmake/cmake-3.9.2/bin/cmake
     buildable: False
   mfem:
     version: [4.0.0]

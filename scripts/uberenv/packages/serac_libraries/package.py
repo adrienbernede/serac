@@ -77,24 +77,27 @@ class SeracLibraries(Package):
     #variant('shared', default=False,
     #        description="Build shared library (disables static library)")
 
-    # TODO: This is gross, eventually there will be global variants
-    # globalVariants = ["~shared",
-    #                   "~shared+debug",
-    #                   "+shared",
-    #                   "+shared+debug",
-    #                   "+debug"]
-    globalVariants = ["~shared",
-                      "~shared+debug"]
-    dependencies = ["hypre",
-                    "metis",
-                    "mfem+superlu-dist",
-                    "parmetis",
-                    "superlu-dist"]
+    # Basic dependencies
+    depends_on("mpi")
 
-    for dep in dependencies:
-        depends_on(dep)
-        for var in globalVariants:
-            depends_on(dep+var, when=var)
+
+    # Libraries that support +debug
+    depends_on("mfem~shared+hypre+metis+superlu-dist+mpi")
+    depends_on("mfem~shared+hypre+metis+superlu-dist+mpi+debug", when="+debug")
+    depends_on("hypre~shared+superlu-dist+mpi")
+    depends_on("hypre~shared+superlu-dist+mpi+debug", when="+debug")
+
+
+    # Libraries that support "build_type=RelWithDebInfo|Debug|Release|MinSizeRel"
+    # TODO: figure out this syntax
+    depends_on("metis~shared")
+    # TODO: figure out if parmetis gets this by default by being a CMakePackage
+    depends_on("parmetis~shared")
+
+
+    # Libraries that do not have a debug variant
+    depends_on("superlu-dist~shared")
+
 
     def install(self, spec, prefix):
 
