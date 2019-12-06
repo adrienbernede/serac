@@ -54,8 +54,13 @@ class Serac(CMakePackage):
     variant('debug', default=False,
             description='Enable runtime safety and debug cheks')
 
-    depends_on('mfem +superlu-dist', when='~debug')
+    variant('shared', default=False,
+            description='Build shared libraries')
+
+    depends_on('mfem +superlu-dist', when='~debug ~shared')
     depends_on('mfem +superlu-dist +debug', when='+debug')
+    depends_on('mfem +superlu-dist +shared', when='+shared')
+    depends_on('mfem +superlu-dist +debug +shared', when='+debug +shared')
 
     phases = ['configure','cmake','build','install']
 
@@ -70,6 +75,10 @@ class Serac(CMakePackage):
         args.append(
                 '-DCMAKE_BUILD_TYPE:=%s' % (
                 'Debug' if '+debug' in spec else 'Release')),
+
+        args.append(
+                '-DBUILD_SHARED_LIBS:BOOL=%s' % (
+                'ON' if '+shared' in spec else 'OFF'),
 
         args.append(
             '-DMFEM_DIR={}'.format(spec['mfem'].prefix)
