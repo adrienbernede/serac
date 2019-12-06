@@ -294,6 +294,9 @@ class SpackEnv(UberEnv):
 
     def read_spack_full_spec(self,pkg_name,spec):
         rv, res = sexe("./spack.sh spec " + pkg_name + " " + spec, ret_output=True)
+        if rv != 0:
+            print("[ERROR: Failed \'spack spec\']")
+            sys.exit(rv)
         for l in res.split("\n"):
             if l.startswith(pkg_name) and l.count("@") > 0 and l.count("arch=") > 0:
                 return l.strip()

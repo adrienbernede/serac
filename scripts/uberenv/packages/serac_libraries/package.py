@@ -72,12 +72,29 @@ class SeracLibraries(Package):
 
     version('develop', branch='develop', submodules=True, preferred=True)
 
-    # List of Serac's third-party library dependencies
-    depends_on('mfem +superlu-dist~shared')
-    depends_on('hypre~shared')
-    depends_on('superlu-dist~shared')
-    depends_on('parmetis~shared')
-    depends_on('metis~shared')
+    variant('debug', default=False,
+            description='Build debug instead of optimized version')
+    #variant('shared', default=False,
+    #        description="Build shared library (disables static library)")
+
+    # TODO: This is gross, eventually there will be global variants
+    # globalVariants = ["~shared",
+    #                   "~shared+debug",
+    #                   "+shared",
+    #                   "+shared+debug",
+    #                   "+debug"]
+    globalVariants = ["~shared",
+                      "~shared+debug"]
+    dependencies = ["hypre",
+                    "metis",
+                    "mfem+superlu-dist",
+                    "parmetis",
+                    "superlu-dist"]
+
+    for dep in dependencies:
+        depends_on(dep)
+        for var in globalVariants:
+            depends_on(dep+var, when=var)
 
     def install(self, spec, prefix):
 

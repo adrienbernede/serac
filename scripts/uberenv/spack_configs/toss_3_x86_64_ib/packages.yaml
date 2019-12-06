@@ -69,10 +69,13 @@ packages:
 # Globally lock in version of packages
   cmake:
     version: [3.9.6]
+    paths:
+      cmake: /usr/WS2/white238/serac/devtools/gcc-8.1.0/cmake-3.9.6
+    buildable: False
   mfem:
     version: [4.0.0]
   hypre:
-    version: [2.10.1]
+    version: [2.15.1]
   superlu-dist:
     version: [6.1.1]
   parmetis:
