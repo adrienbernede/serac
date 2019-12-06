@@ -74,11 +74,11 @@ class Serac(CMakePackage):
 
         args.append(
                 '-DCMAKE_BUILD_TYPE:=%s' % (
-                'Debug' if '+debug' in spec else 'Release')),
+                'Debug' if '+debug' in spec else 'Release'))
 
         args.append(
                 '-DBUILD_SHARED_LIBS:BOOL=%s' % (
-                'ON' if '+shared' in spec else 'OFF'),
+                'ON' if '+shared' in spec else 'OFF'))
 
         args.append(
             '-DMFEM_DIR={}'.format(spec['mfem'].prefix)
