@@ -6,16 +6,23 @@ Serac is a 3D implicit nonlinear thermal-structural simulation code. It's primar
 Getting Started
 ------
 Serac uses git submodules, to clone the project:
+
 1. git clone --recursive ssh://git@cz-bitbucket.llnl.gov:7999/ser/serac.git
 
-The easiest path to install both serac and its dependencies is to use spack. This has been encapsulated using Uberenv (TODO). It will generate a uberenv_libs directory containing a Spack instance with Serac dependencies installed. It also generate a host-config file (uberenv_libs/\<config_dependent_name\>.cmake) we can now use to build Serac. The CMake configuration phase has also been encapsulated in config-build.py.
+The easiest path to install both serac and its dependencies is to use spack. This has been encapsulated using Uberenv (TODO). It will generate a uberenv_libs directory containing a Spack instance with Serac dependencies installed. It also generate a host-config file (\<config_dependent_name\>.cmake in the project root dir) we can now use to build Serac. The CMake configuration phase has also been encapsulated in config-build.py.
+
 2. `python scripts/uberenv/uberenv.py --spec=@develop`
+
 3. `python ./config-build.py -hc \<config_dependent_name\>.cmake`
+
 4. `cd build-<system-and-toolchain>
+
 4. `cmake --build .`
+
 5. `ctest .`
 
 If you already have a spack instance you would like to reuse, you can do so changing the uberenv command as follow:
+
 2. `python scripts/uberenv/uberenv.py --spec=@develop --upstream=\</path/to/my/spack\>/opt/spack`
 
 If you would like to use an existing installation of [MFEM](https://github.com/mfem/mfem/) (outside of Spack), you can write your own host-config file porviding the necessary information:
