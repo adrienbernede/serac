@@ -70,7 +70,7 @@ packages:
   cmake:
     version: [3.9.2]
     paths:
-      cmake: /usr/tce/packages/cmake/cmake-3.9.2/bin/cmake
+      cmake: /usr/tce/packages/cmake/cmake-3.9.2
     buildable: False
   mfem:
     version: [4.0.0]
