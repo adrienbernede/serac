@@ -52,7 +52,7 @@ class Serac(CMakePackage):
     version('develop', branch='develop', submodules=True, preferred=True)
 
     variant('debug', default=False,
-            description='Enable runtime safety and debug cheks')
+            description='Enable runtime safety and debug checks')
 
     depends_on('mfem +superlu-dist', when='~debug')
     depends_on('mfem +superlu-dist +debug', when='+debug')
