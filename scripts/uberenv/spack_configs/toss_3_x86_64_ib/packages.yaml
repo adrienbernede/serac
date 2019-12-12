@@ -2,8 +2,8 @@ packages:
   all:
     compiler: [gcc, intel, pgi, clang, xl, nag]
     providers:
-      blas: [openblas]
-      lapack: [openblas]
+      blas: [netlib-lapack]
+      lapack: [netlib-lapack]
       mpi: [mvapich2]
   mvapich2:
     paths:
@@ -21,6 +21,12 @@ packages:
     buildable: False
   mpilander:
     buildable: False  
+# blas is a bit more complicated because its a virtual package so fake it with the following
+# per spack docs
+  netlib-lapack:
+    paths:
+      netlib-lapack@3.6.1: /usr
+    buildable: False
 # System level packages to not build
   autoconf:
     paths:
@@ -29,7 +35,7 @@ packages:
   automake:
     paths:
       automake: /usr/
-    buildable: False 
+    buildable: False
   bzip2:
    paths:
       bzip2: /usr/
