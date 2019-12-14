@@ -264,7 +264,11 @@ class SpackEnv(UberEnv):
         self.pkg_version = self.project_opts["package_version"]
 
         if opts["package_final_phase"]:
-            self.pkg_stop_phase = opts["package_final_phase"]
+            try:
+                self.pkg_stop_phase = opts["package_final_phase"]
+            except (KeyError, ValueError) as e:
+                print("ERROR: package_stop_phase must be defined in project.json")
+                raise
         else:
             self.pkg_stop_phase = self.project_opts["package_final_phase"]
 
@@ -459,14 +463,10 @@ class SpackEnv(UberEnv):
             install_cmd += "-k "
         install_cmd += "dev-build -d {} ".format(self.pkg_src_dir)
         if not self.opts["install"]:
-            try:
-                if self.pkg_stop_phase:
-                    install_cmd += "-u {} ".format(self.pkg_stop_phase)
-                else:
-                    raise ValueError("package_stop_phase cannot be empty.")
-            except (KeyError, ValueError) as e:
-                print("ERROR: hostconfig_phase must be defined in project.json")
-                raise
+            if self.pkg_stop_phase:
+                install_cmd += "-u {} ".format(self.pkg_stop_phase)
+            else:
+                raise ValueError("package_stop_phase cannot be empty.")
         if self.opts["run_tests"]:
             install_cmd += "--test=root "
         install_cmd += self.pkg_name + self.opts["spec"]
