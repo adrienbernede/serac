@@ -35,7 +35,7 @@ Unlimited Open Source - BSD 3-clause Distribution
 `LLNL-CODE-805541`
 
 SPDX usage
------------
+----------
 
 Individual files contain SPDX tags instead of the full license text.
 This enables machine processing of license information based on the SPDX
@@ -56,10 +56,10 @@ follows.  See the license included with each package for full details.
 
 [//]: # (Note: The spaces at the end of each line below add line breaks)
 
-PackageName: BLT  
-PackageHomePage: https://github.com/LLNL/blt  
-PackageLicenseDeclared: BSD-3-Clause  
+PackageName: BLT
+PackageHomePage: https://github.com/LLNL/blt
+PackageLicenseDeclared: BSD-3-Clause
 
-PackageName: uberenv  
-PackageHomePage: https://github.com/LLNL/uberenv  
-PackageLicenseDeclared: BSD-3-Clause  
+PackageName: uberenv
+PackageHomePage: https://github.com/LLNL/uberenv
+PackageLicenseDeclared: BSD-3-Clause
