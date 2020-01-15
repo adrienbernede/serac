@@ -13,7 +13,7 @@
 # Per-user settings (overrides default and site settings):
 #   ~/.spack/packages.yaml
 # -------------------------------------------------------------------------
-packages:
+packages::
   all:
     compiler: [clang, gcc, intel, pgi, xl, nag]
     providers:
@@ -56,4 +56,21 @@ packages:
       cuda@8.0: /Developer/NVIDIA/CUDA-8.0
       cuda@9.0: /Developer/NVIDIA/CUDA-9.0
     buildable: False
-
+  mvapich:
+    buildable: False
+  spectrum-mpi:
+    buildable: False
+  intel-mpi:
+    buildable: False
+  intel-parallel-studio:
+    buildable: False
+  mpilander:
+    buildable: False
+  charmpp:
+    buildable: False
+  charm:
+    buildable: False
+  fujitsu-mpi:
+    buildable: False
+  mpt:
+    buildable: False

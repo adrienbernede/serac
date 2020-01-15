@@ -13,7 +13,7 @@
 # Per-user settings (overrides default and site settings):
 #   ~/.spack/config.yaml
 # -------------------------------------------------------------------------
-config:
+config::
   # This is the path to the root of the Spack install tree.
   # You can use $spack here to refer to the root of the spack instance.
   install_tree: $spack/..
