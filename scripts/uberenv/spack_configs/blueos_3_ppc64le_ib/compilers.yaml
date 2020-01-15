@@ -1,4 +1,4 @@
-compilers:
+compilers::
 - compiler:
     environment: {}
     extra_rpaths: []
@@ -21,8 +21,8 @@ compilers:
     paths:
       cc:  /usr/tcetmp/packages/clang/clang-4.0.0/bin/clang
       cxx: /usr/tcetmp/packages/clang/clang-4.0.0/bin/clang++
-      f77: None 
-      fc: None 
+      f77: None
+      fc: None
     spec: clang@4.0.0
     target: ppc64le
 - compiler:
@@ -38,6 +38,3 @@ compilers:
       fc: //usr/tce/packages/xl/xl-beta-2017.10.13/xlf2003-gpu
     spec: xl@13.1
     target: ppc64le
-
-
- 

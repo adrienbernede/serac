@@ -14,7 +14,7 @@
 # Per-user settings (overrides default and site settings):
 #   ~/.spack/packages.yaml
 # -------------------------------------------------------------------------
-packages:
+packages::
   all:
     compiler: [gcc, intel, pgi, clang, xl, nag]
     providers:
@@ -53,5 +53,23 @@ packages:
       mvapich2@2.2%clang@coral: /usr/tcetmp/packages/spectrum-mpi/spectrum-mpi-2017.04.03-clang-4.0.0
       mvapich2@2.2%xl@13.1 : /usr/tcetmp/packages/spectrum-mpi/spectrum-mpi-2017.11.10-xl-beta-2017.10.13
     buildable: False
-
-
+  openmpi:
+    buildable: False
+  mpich:
+    buildable: False
+  spectrum-mpi:
+    buildable: False
+  intel-mpi:
+    buildable: False
+  intel-parallel-studio:
+    buildable: False
+  mpilander:
+    buildable: False
+  charmpp:
+    buildable: False
+  charm:
+    buildable: False
+  fujitsu-mpi:
+    buildable: False
+  mpt:
+    buildable: False

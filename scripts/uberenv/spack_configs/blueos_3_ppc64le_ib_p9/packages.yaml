@@ -14,7 +14,7 @@
 # Per-user settings (overrides default and site settings):
 #   ~/.spack/packages.yaml
 # -------------------------------------------------------------------------
-packages:
+packages::
   all:
     compiler: [gcc, intel, pgi, clang, xl, nag]
     providers:
@@ -64,9 +64,27 @@ packages:
 # so even though this is spectrum mpi, we call it mvapich2
   mvapich2:
     paths:
-      mvapich2@2.2%gcc@4.9.3: /usr/tce/packages/spectrum-mpi/spectrum-mpi-rolling-release-gcc-4.9.3/ 
+      mvapich2@2.2%gcc@4.9.3: /usr/tce/packages/spectrum-mpi/spectrum-mpi-rolling-release-gcc-4.9.3/
       mvapich2@2.2%clang@coral: /usr/tce/packages/spectrum-mpi/spectrum-mpi-rolling-release-clang-upstream-2018.12.03/
-      mvapich2@2.2%xl@coral: /usr/tce/packages/spectrum-mpi/spectrum-mpi-rolling-release-xl-2018.11.26/ 
+      mvapich2@2.2%xl@coral: /usr/tce/packages/spectrum-mpi/spectrum-mpi-rolling-release-xl-2018.11.26/
     buildable: False
-
-
+  openmpi:
+    buildable: False
+  mpich:
+    buildable: False
+  spectrum-mpi:
+    buildable: False
+  intel-mpi:
+    buildable: False
+  intel-parallel-studio:
+    buildable: False
+  mpilander:
+    buildable: False
+  charmpp:
+    buildable: False
+  charm:
+    buildable: False
+  fujitsu-mpi:
+    buildable: False
+  mpt:
+    buildable: False
