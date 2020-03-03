@@ -432,9 +432,11 @@ class SpackEnv(UberEnv):
         else:
             # let spack try to auto find compilers
             sexe("spack/bin/spack compiler find", echo=True)
-        dest_spack_pkgs = pjoin(spack_dir,"var","spack","repos","builtin","packages")
-        # hot-copy our packages into spack
-        sexe("cp -Rf {} {}".format(self.pkgs,dest_spack_pkgs))
+
+        if not self.pkgs:
+            # hot-copy our packages into spack
+            dest_spack_pkgs = pjoin(spack_dir,"var","spack","repos","builtin","packages")
+            sexe("cp -Rf {} {}".format(self.pkgs,dest_spack_pkgs))
 
 
     def clean_build(self):
@@ -464,11 +466,12 @@ class SpackEnv(UberEnv):
         install_cmd = "spack/bin/spack "
         if self.opts["ignore_ssl_errors"]:
             install_cmd += "-k "
-        install_cmd += "dev-build -d {} ".format(self.pkg_src_dir)
         if not self.opts["install"]:
-            install_cmd += "-u {} ".format(self.pkg_final_phase)
-        if self.opts["run_tests"]:
-            install_cmd += "--test=root "
+            install_cmd += "dev-build --quiet -d {} -u {} ".format(self.pkg_src_dir,self.pkg_final_phase)
+        else:
+            install_cmd += "install "
+            if self.opts["run_tests"]:
+                install_cmd += "--test=root "
         install_cmd += self.pkg_name + self.opts["spec"]
         res = sexe(install_cmd, echo=True)
         if res != 0:
@@ -506,7 +509,7 @@ class SpackEnv(UberEnv):
                 if os.path.islink(pkg_lnk_dir):
                     os.unlink(pkg_lnk_dir)
                 print("")
-                print("[symlinking install to {}]").format(pjoin(self.dest_dir,pkg_lnk_dir))
+                print("[symlinking install to {}]".format(pjoin(self.dest_dir,pkg_lnk_dir)))
                 os.symlink(pkg_path["path"],os.path.abspath(pkg_lnk_dir))
                 hcfg_glob = glob.glob(pjoin(pkg_lnk_dir,"*.cmake"))
                 if len(hcfg_glob) > 0:
@@ -514,10 +517,25 @@ class SpackEnv(UberEnv):
                     hcfg_fname = os.path.split(hcfg_path)[1]
                     if os.path.islink(hcfg_fname):
                         os.unlink(hcfg_fname)
+                    elif os.path.isfile(hcfg_fname):
+                        sexe("rm -f {}".format(hcfg_fname))
                     print("[symlinking host config file to {}]".format(pjoin(self.dest_dir,hcfg_fname)))
                     os.symlink(hcfg_path,hcfg_fname)
                 print("")
                 print("[install complete!]")
+        else:
+            pattern = "*{}.cmake".format(self.pkg_name)
+            build_dir = pjoin(self.pkg_src_dir,"spack-build")
+            hcfg_glob = glob.glob(pjoin(build_dir,pattern))
+            if len(hcfg_glob) > 0:
+                hcfg_path  = hcfg_glob[0]
+                hcfg_fname = os.path.split(hcfg_path)[1]
+                if os.path.islink(hcfg_fname):
+                    os.unlink(hcfg_fname)
+                print("[copying host config file to {}]".format(pjoin(self.dest_dir,hcfg_fname)))
+                sexe("cp {} {}".format(hcfg_path,hcfg_fname))
+                print("[removing project build directory {}]".format(pjoin(build_dir)))
+                sexe("rm -rf {}".format(build_dir))
 
     def get_mirror_path(self):
         mirror_path = self.opts["mirror"]
@@ -719,3 +737,5 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
