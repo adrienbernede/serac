@@ -12,3 +12,4 @@ spack:
   - packages.yaml
 
   view: false
+  specs: []
