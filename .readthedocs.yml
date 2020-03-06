@@ -17,4 +17,4 @@ python:
   version: 2.7
 
 conda:
-  file: src/docs/environment.yml
+  environment: src/docs/environment.yml
