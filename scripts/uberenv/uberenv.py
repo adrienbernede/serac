@@ -448,7 +448,7 @@ class SpackEnv(UberEnv):
         if not self.pkgs:
             # hot-copy our packages into spack
             dest_spack_pkgs = pjoin(spack_dir,"var","spack","repos","builtin","packages")
-            sexe("cp -Rf {} {}".format(self.pkgs,dest_spack_pkgs))
+            sexe("cp -Rf {} {}".format(self.pkgs,dest_spack_pkgs), echo=True)
 
 
     def clean_build(self):
