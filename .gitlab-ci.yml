@@ -33,8 +33,13 @@ setup_env:
   script:
     - mkdir -p ${BUILD_ROOT}
 
+# Whether and how to update uberenv
+.run_update_uberenv: &run_update_uberenv |
+  [[ -n "${UPDATE_UBERENV}" ]] && ./scripts/gitlab/update-uberenv.sh "${UPDATE_UBERENV}"
+
 .dependencies_toss_3_x86_64_ib_script:
   script:
+    - *run_update_uberenv
     - echo ${SLURM_ALLOC_NAME}
     - export JOBID=$(squeue -h --name=${SLURM_ALLOC_NAME} --format=%A)
     - echo ${JOBID}
