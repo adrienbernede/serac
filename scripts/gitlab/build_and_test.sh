@@ -10,7 +10,7 @@ set -e
 
 PROJECT_DIRECTORY="$(pwd)"
 BUILD_DIRECTORY="${BUILD_ROOT}/build_${COMPILER}"
-CCONF="${BUILD_ROOT}/${COMPILER}.cmake"
+CCONF="${LIBS_ROOT}/${COMPILER}.cmake"
 
 # If building, then delete everything first
 if [[ "${1}" != "--test-only" ]]
