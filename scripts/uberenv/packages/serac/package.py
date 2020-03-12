@@ -64,10 +64,10 @@ def path_replace(path, path_replacements):
 class Serac(CMakePackage):
     """FIXME: Put a proper description of your package here."""
 
-    homepage = "https://www.github.com/LLNL/serac"
-    git      = "ssh://git@github.com:LLNL/serac.git"
+    homepage = "https://github.com/LLNL/serac"
+    git      = "https://github.com/LLNL/serac.git"
 
-    version('develop', branch='develop', submodules=True, preferred=True)
+    version('master', branch='master', submodules=True, preferred=True)
 
     variant('debug', default=False,
             description='Enable runtime safety and debug checks')
