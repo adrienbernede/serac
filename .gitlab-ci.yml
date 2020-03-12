@@ -6,8 +6,8 @@
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
   SLURM_ALLOC_NAME: serac_$CI_COMMIT_SHORT_SHA
-  BUILD_ROOT: ${CI_BUILDS_DIR}/serac/${CI_COMMIT_REF_SLUG}_${CI_PIPELINE_ID}/${SYS_TYPE}
-  LIBS_ROOT: ${CI_BUILDS_DIR}/serac/${CI_COMMIT_REF_SLUG}_${CI_PIPELINE_ID}/${SYS_TYPE}/uberenv_libs_${COMPILER}
+  BUILD_ROOT: ${CI_BUILDS_DIR}/serac/${CI_COMMIT_REF_SLUG}_${CI_PIPELINE_ID}
+  LIBS_ROOT: ${CI_BUILDS_DIR}/serac/${CI_COMMIT_REF_SLUG}_${CI_PIPELINE_ID}/uberenv_libs_${COMPILER}
   SPACK_MIRROR: /usr/workspace/radiuss/mirrors/packages
 
 before_script:
