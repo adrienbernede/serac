@@ -38,7 +38,9 @@ release_resources_build_quartz:
     - JOBID="$(squeue -h --name=${SLURM_ALLOC_NAME} --format=%A)"
     - JOBID="$( [[ -n ${JOBID} ]] && echo --jobid=${JOBID} )"
     - EXEC_PREFIX="srun ${JOBID} -t 20 -N 1 -n 1 -c 4"
+    - echo -e "section_start:`date +%s`:dependencies\r\e[0KBuild dependencies and generate host-config file (uberenv)"
     - ${EXEC_PREFIX} python scripts/uberenv/uberenv.py --spec=${SPEC}
+    - echo -e "section_end:`date +%s`:dependencies\r\e[0K"
     - ${EXEC_PREFIX} scripts/gitlab/build_and_test.sh
 
 ####
