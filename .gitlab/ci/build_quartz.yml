@@ -35,21 +35,25 @@ release_resources_build_quartz:
   extends: .on_quartz
   stage: build
   script:
+    #Use pre-existing allocation if any
     - JOBID="$(squeue -h --name=${SLURM_ALLOC_NAME} --format=%A)"
     - EXEC_PREFIX="srun $( [[ -n ${JOBID} ]] && echo --jobid=${JOBID} )"
+    #DEPENDENCIES
     - RESOURCES="-t 20 -N 1 -n 1 -c 4"
-    - echo "DEPENDENCIES"
-    - echo -e "section_start:$(date +%s):dependencies\r\e[0KBuild dependencies and generate host-config file (uberenv)"
+    - echo -e "section_start:$(date +%s):dependencies\r\e[0K |
+      Build dependencies and generate host-config file (uberenv)"
     - ${EXEC_PREFIX} ${RESOURCES} scripts/gitlab/build_and_test.sh --deps-only
     - echo -e "section_end:$(date +%s):dependencies\r\e[0K"
-    - echo "BUILD"
+    #BUILD
     - RESOURCES="-t 5 -N 1 -n 1 -c 4"
-    - echo -e "section_start:$(date +%s):build\r\e[0KBuild ${CI_PROJECT_NAME}"
+    - echo -e "section_start:$(date +%s):build\r\e[0K |
+      Build ${CI_PROJECT_NAME}"
     - ${EXEC_PREFIX} ${RESOURCES} scripts/gitlab/build_and_test.sh --build-only
     - echo -e "section_end:$(date +%s):build\r\e[0K"
-    - echo "TEST"
+    #TEST
     - RESOURCES="-t 5 -N 1 -n 1 -c 4"
-    - echo -e "section_start:$(date +%s):tests\r\e[0KBuild dependencies and generate host-config file (uberenv)"
+    - echo -e "section_start:$(date +%s):tests\r\e[0K |
+      Build dependencies and generate host-config file (uberenv)"
     - ${EXEC_PREFIX} ${RESOURCES} scripts/gitlab/build_and_test.sh --test-only
     - echo -e "section_end:$(date +%s):tests\r\e[0K"
 
