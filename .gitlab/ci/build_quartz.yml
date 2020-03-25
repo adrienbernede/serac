@@ -36,12 +36,20 @@ release_resources_build_quartz:
   stage: build
   script:
     - JOBID="$(squeue -h --name=${SLURM_ALLOC_NAME} --format=%A)"
-    - JOBID="$( [[ -n ${JOBID} ]] && echo --jobid=${JOBID} )"
-    - EXEC_PREFIX="srun ${JOBID} -t 20 -N 1 -n 1 -c 4"
-    - echo -e "section_start:`date +%s`:dependencies\r\e[0KBuild dependencies and generate host-config file (uberenv)"
-    - ${EXEC_PREFIX} python scripts/uberenv/uberenv.py --spec=${SPEC}
-    - echo -e "section_end:`date +%s`:dependencies\r\e[0K"
-    - ${EXEC_PREFIX} scripts/gitlab/build_and_test.sh
+    - EXEC_PREFIX="srun $( [[ -n ${JOBID} ]] && echo --jobid=${JOBID} )"
+    - RESOURCES="-t 20 -N 1 -n 1 -c 4"
+    - echo "###"
+    - echo -e "section_start:$(date +%s):dependencies\r\e[0KBuild dependencies and generate host-config file (uberenv)"
+    - ${EXEC_PREFIX} ${RESOURCES} script/gitlab/build_and_test.sh --deps-only
+    - echo -e "section_end:$(date +%s):dependencies\r\e[0K"
+    - echo "###"
+    - echo -e "section_start:$(date +%s):build\r\e[0KBuild ${CI_PROJECT_NAME}"
+    - ${EXEC_PREFIX} ${RESOURCES} script/gitlab/build_and_test.sh --build-only
+    - echo -e "section_end:$(date +%s):build\r\e[0K"
+    - echo "###"
+    - echo -e "section_start:$(date +%s):tests\r\e[0KBuild dependencies and generate host-config file (uberenv)"
+    - ${EXEC_PREFIX} ${RESOURCES} script/gitlab/build_and_test.sh --test-only
+    - echo -e "section_end:$(date +%s):tests\r\e[0K"
 
 ####
 # Build jobs
