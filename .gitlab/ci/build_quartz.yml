@@ -41,10 +41,10 @@ release_resources_build_quartz:
   script:
     - JOBID="$(squeue -h --name=${SLURM_ALLOC_NAME} --format=%A)"
     - JOBID="$( [[ -n ${JOBID} ]] && echo --jobid=${JOBID} )"
-    - EXEC_PREFIX="srun ${JOBID} -t 30 -N 1 -n 1 -c 12 -p pdebug"
+    - EXEC_PREFIX="srun ${JOBID} -t 30 -N 1 -n 1 -c 36 -p pdebug"
     - ${EXEC_PREFIX} python scripts/uberenv/uberenv.py --spec=${SPEC} > deps-build-log.txt
     - JOBID="$( [[ -n ${JOBID} ]] && echo --jobid=${JOBID} )"
-    - EXEC_PREFIX="srun ${JOBID} -t 5 -N 1 -n 1 -c 12 -p pdebug"
+    - EXEC_PREFIX="srun ${JOBID} -t 5 -N 1 -n 1 -c 36 -p pdebug"
     - ${EXEC_PREFIX} scripts/gitlab/build_and_test.sh
   artifacts:
     paths:
@@ -52,17 +52,17 @@ release_resources_build_quartz:
 
 ####
 # Build jobs
-build_quartz_clang_4_0_0:
-  variables:
-    COMPILER: "clang@4.0.0"
-    SPEC: "@develop%${COMPILER}"
-  extends: .build_quartz
-
-build_quartz_gcc_8_1_0:
-  variables:
-    COMPILER: "gcc@8.1.0"
-    SPEC: "@develop%${COMPILER}"
-  extends: .build_quartz
+#build_quartz_clang_4_0_0:
+#  variables:
+#    COMPILER: "clang@4.0.0"
+#    SPEC: "@develop%${COMPILER}"
+#  extends: .build_quartz
+#
+#build_quartz_gcc_8_1_0:
+#  variables:
+#    COMPILER: "gcc@8.1.0"
+#    SPEC: "@develop%${COMPILER}"
+#  extends: .build_quartz
 
 build_quartz_intel_19_0_4:
   variables:
