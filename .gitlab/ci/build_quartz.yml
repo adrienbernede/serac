@@ -40,7 +40,9 @@ release_resources_build_quartz:
   stage: build
   script:
     - JOBID=$(squeue -h --name=${PROJECT_ALLOC_NAME} --format=%A)
+    - echo $JOBID
     - EXEC_PREFIX="srun $( [[ -n "${JOBID}" ]] && echo "--jobid=${JOBID}" ) -t 20 -N 1 -n 1 -c 4"
+    - echo $EXEC_PREFIX
     - ${EXEC_PREFIX} python scripts/uberenv/uberenv.py --spec=${SPEC}
     - ${EXEC_PREFIX} scripts/gitlab/build_and_test.sh
 
