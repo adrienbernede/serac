@@ -43,6 +43,7 @@ release_resources_build_quartz:
     - JOBID="$( [[ -n ${JOBID} ]] && echo --jobid=${JOBID} )"
     - EXEC_PREFIX="srun ${JOBID} -t 30 -N 1 -n 1 -c 36 -p pdebug"
     - ${EXEC_PREFIX} python scripts/uberenv/uberenv.py --spec=${SPEC} > deps-build-log.txt
+    - JOBID="$(squeue -h --name=${SLURM_ALLOC_NAME} --format=%A)"
     - JOBID="$( [[ -n ${JOBID} ]] && echo --jobid=${JOBID} )"
     - EXEC_PREFIX="srun ${JOBID} -t 5 -N 1 -n 1 -c 36 -p pdebug"
     - ${EXEC_PREFIX} scripts/gitlab/build_and_test.sh
