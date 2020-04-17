@@ -41,9 +41,14 @@ release_resources_build_quartz:
   script:
     - JOBID="$(squeue -h --name=${SLURM_ALLOC_NAME} --format=%A)"
     - JOBID="$( [[ -n ${JOBID} ]] && echo --jobid=${JOBID} )"
-    - EXEC_PREFIX="srun ${JOBID} -t 20 -N 1 -n 1 -c 4"
-    - ${EXEC_PREFIX} python scripts/uberenv/uberenv.py --spec=${SPEC}
+    - EXEC_PREFIX="srun ${JOBID} -t 30 -N 1 -n 1 -c 12 -p pdebug"
+    - ${EXEC_PREFIX} python scripts/uberenv/uberenv.py --spec=${SPEC} > deps-build-log.txt
+    - JOBID="$( [[ -n ${JOBID} ]] && echo --jobid=${JOBID} )"
+    - EXEC_PREFIX="srun ${JOBID} -t 5 -N 1 -n 1 -c 12 -p pdebug"
     - ${EXEC_PREFIX} scripts/gitlab/build_and_test.sh
+  artifacts:
+    paths:
+    - uberenv_libs/deps-build-log.txt
 
 ####
 # Build jobs
