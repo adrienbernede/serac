@@ -32,7 +32,14 @@ then
         exit 1
     fi
 
-    python scripts/uberenv/uberenv.py --spec=${spec}
+    if [[ ${CI} == "true" ]]
+    then
+        prefix="/dev/shm/${CI_PROJECT_ID}_${CI_PIPELINE_ID}_${spec}"
+        mkdir -p "${prefix}"
+        python scripts/uberenv/uberenv.py --spec=${spec} --prefix="${prefix}"
+    else
+        python scripts/uberenv/uberenv.py --spec=${spec}
+    fi
 
 fi
 
