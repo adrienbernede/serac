@@ -16,7 +16,7 @@
 config:
   # This is the path to the root of the Spack install tree.
   # You can use $spack here to refer to the root of the spack instance.
-  install_tree: $spack/..
+  install_tree: /usr/workspace/bernede1/serac-deps-installs
 
   # install directory layout
   install_path_scheme: "${COMPILERNAME}-${COMPILERVER}/${PACKAGE}-${VERSION}"
@@ -55,7 +55,7 @@ config:
 
   # Cache directory for miscellaneous files, like the package index.
   # This can be purged with `spack purge --misc-cache`
-  misc_cache: .spack/misccache
+  misc_cache: $spack/../misccache
 
 
   # If this is false, tools like curl that use SSL will not verify
