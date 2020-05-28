@@ -52,10 +52,11 @@ stages:
 .srun_build_with_deps_script:
   script:
     - *run_update_uberenv
-    - salloc ${ACCOUNT} -N 1 -c 36 -t 30 --no-shell --job-name=${CI_JOB_NAME}
-    - JOBID=$(squeue -h --name=${CI_JOB_NAME} --format=%A)
+    - salloc ${ACCOUNT} -N 1 -c 36 -t 30 --no-shell --job-name=${CI_JOB_ID}
+    - JOBID=$(squeue -h --name=${CI_JOB_ID} --format=%A)
     - echo -e "~~~~~~~~~~~~~~~~~~~~~~~~~~"
     - echo -e "CI_JOB_NAME:${CI_JOB_NAME}"
+    - echo -e "CI_JOB_ID:${CI_JOB_ID}"
     - echo -e "JOBID:${JOBID}"
     - echo -e "~~~~~~~~~~~~~~~~~~~~~~~~~~"
     - ASSIGN_ID=$(if [[ -n "${JOBID}" ]]; then echo "--jobid=${JOBID}"; fi)
