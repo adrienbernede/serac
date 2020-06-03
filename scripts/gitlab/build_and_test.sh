@@ -9,6 +9,11 @@
 set -o errexit
 set -o nounset
 
+echo -e "~~~~~~~~~~~~~~~~~~~~~~~~~~"
+echo -e "CI_JOB_NAME:${CI_JOB_NAME}"
+echo -e "CI_JOB_ID:${CI_JOB_ID}"
+echo -e "~~~~~~~~~~~~~~~~~~~~~~~~~~"
+
 option=${1:-""}
 hostname="$(hostname)"
 project_dir="$(pwd)"
