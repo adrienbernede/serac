@@ -12,6 +12,7 @@ set -o nounset
 echo -e "~~~~~~~~~~~~~~~~~~~~~~~~~~"
 echo -e "CI_JOB_NAME:${CI_JOB_NAME}"
 echo -e "CI_JOB_ID:${CI_JOB_ID}"
+echo -e "SLURM_JOB_ID:${SLURM_JOB_ID}"
 echo -e "~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
 option=${1:-""}
