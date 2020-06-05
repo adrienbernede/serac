@@ -53,20 +53,11 @@ then
     fi
     hostconfig="${hostname//[0-9]/}-${sys_type}-${compiler}.cmake"
 
-    # First try with where uberenv generates host-configs.
     hostconfig_path="${project_dir}/${hostconfig}"
     if [[ ! -f ${hostconfig_path} ]]
     then
         echo "File not found: ${hostconfig_path}"
         echo "Spack generated host-config not found, trying with predefined"
-    fi
-    # Otherwise look into project predefined host-configs.
-    hostconfig_path="${project_dir}/host-configs/${hostconfig}"
-    if [[ ! -f ${hostconfig_path} ]]
-    then
-        echo "File not found: ${hostconfig_path}"
-        echo "Predefined host-config not found, aborting"
-        exit 1
     fi
 else
     # Using provided host-config file.
