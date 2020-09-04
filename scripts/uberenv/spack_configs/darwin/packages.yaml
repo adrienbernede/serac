@@ -42,23 +42,59 @@ packages:
     version: [master]
   python:
     variants: +shared~dbm
-  cmake:
-    version: [3.9.6]
-    variants: ~openssl~ncurses
   hwloc:
     variants: ~libxml2
+
+# CUDA standard MacOS install paths
+  cuda:
+    buildable: false
+    externals:
+    - spec: cuda@8.0
+      prefix: /Developer/NVIDIA/CUDA-8.0
+    - spec: cuda@9.0
+      prefix: /Developer/NVIDIA/CUDA-9.0
+
+  autotools:
+    paths:
+      autotools: /usr/bin/
+    buildable: False
+  bzip2:
+   paths:
+      bzip2: /usr/bin/
+   buildable: False
+  gettext:
+   paths:
+      gettext: /usr/bin/
+   buildable: False
+  m4:
+   paths:
+      m4: /usr/bin/
+   buildable: False
+  pkg-config:
+    paths:
+      pkg-config: /usr/bin/
+    buildable: False
+  tar:
+   paths:
+      tar: /usr/bin/
+   buildable: False
   perl:
     buildable: false
     externals:
     - spec: perl
       prefix: /usr/
 
-# CUDA standard MacOS install paths
-  cuda:
-    buildable: false
+# CMake version needs to be at least 3.9.6
+  cmake:
+    path:
+      cmake: /usr/local/bin/
+      # example when installed with brew
+      #cmake@3.17.2: /usr/local/Cellar/cmake/3.17.2/bin/
+    buildable: False
 
-    externals:
-    - spec: cuda@8.0
-      prefix: /Developer/NVIDIA/CUDA-8.0
-    - spec: cuda@9.0
-      prefix: /Developer/NVIDIA/CUDA-9.0
+  openmpi:
+    path:
+      openmpi: /usr/local/bin/
+      # example when installed with brew
+      #openmpi@4.0.3: /usr/local/Cellar/open-mpi/4.0.3/bin/
+    buildable: False
