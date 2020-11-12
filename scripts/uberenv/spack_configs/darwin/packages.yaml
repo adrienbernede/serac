@@ -54,17 +54,13 @@ packages:
     - spec: cuda@9.0
       prefix: /Developer/NVIDIA/CUDA-9.0
 
-  autotools:
-    paths:
-      autotools: /usr/bin/
-    buildable: False
   bzip2:
    paths:
       bzip2: /usr/bin/
    buildable: False
   gettext:
    paths:
-      gettext: /usr/bin/
+      gettext: /usr/local/bin/
    buildable: False
   m4:
    paths:
@@ -72,7 +68,7 @@ packages:
    buildable: False
   pkg-config:
     paths:
-      pkg-config: /usr/bin/
+      pkg-config: /usr/local/bin/
     buildable: False
   tar:
    paths:
@@ -82,7 +78,7 @@ packages:
     buildable: false
     externals:
     - spec: perl
-      prefix: /usr/
+      prefix: /usr/local/bin/
 
 # CMake version needs to be at least 3.9.6
   cmake:

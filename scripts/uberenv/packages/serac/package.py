@@ -393,7 +393,7 @@ class Serac(CMakePackage, CudaPackage):
                 path_replacements[devtools_root] = "${DEVTOOLS_ROOT}"
                 cfg.write("# Root directory for generated developer tools\n")
                 cfg.write(cmake_cache_entry("DEVTOOLS_ROOT",devtools_root))
-	
+
         if spec.satisfies('target=ppc64le:'):
             cfg.write("# Docs dont work on blueos machines, there is a prompt that waits for user input\n")
             cfg.write(cmake_cache_option("ENABLE_DOCS", False))
