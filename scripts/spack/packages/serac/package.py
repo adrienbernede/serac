@@ -311,11 +311,6 @@ class Serac(CMakePackage, CudaPackage):
                 cfg.write(cmake_cache_string("CMAKE_CUDA_FLAGS", cuda_flags))
                 cfg.write(cmake_cache_string("CMAKE_CUDA_ARCHITECTURES", ' '.join(cuda_arch)))
 
-            sys_type = spec.architecture
-            # if on llnl systems, we can use the SYS_TYPE
-            if "SYS_TYPE" in env:
-                sys_type = env["SYS_TYPE"]
-
             # are we on a specific machine
             on_blueos = 'blueos' in sys_type
 
