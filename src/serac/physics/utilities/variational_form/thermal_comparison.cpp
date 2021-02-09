@@ -8,11 +8,11 @@
 #include "serac/serac_config.hpp"
 #include "serac/physics/operators/stdfunction_operator.hpp"
 #include "serac/numerics/expr_template_ops.hpp"
+#include "axom/slic/core/SimpleLogger.hpp"
+#include "serac/infrastructure/profiling.hpp"
 
 using namespace std;
 using namespace mfem;
-
-#include "axom/slic/core/SimpleLogger.hpp"
 
 // solve an equation of the form
 // (a * M + b * K) x == f
@@ -29,6 +29,7 @@ int main(int argc, char* argv[])
   MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
   axom::slic::SimpleLogger logger;
+  serac::profiling::initializeCaliper();
 
   const char * mesh_file = SERAC_REPO_DIR"/data/meshes/star.mesh";
 
@@ -57,6 +58,8 @@ int main(int argc, char* argv[])
     args.PrintOptions(cout);
   }
 
+  SERAC_MARK_START("main");
+  
   Mesh mesh(mesh_file, 1, 1);
   for (int l = 0; l < refinements; l++) {
     mesh.UniformRefinement();
@@ -180,6 +183,10 @@ int main(int argc, char* argv[])
   sol_sock2.precision(8);
   sol_sock2 << "solution\n" << pmesh << x2 << flush;
 
+  SERAC_MARK_END("main");
+  serac::profiling::setCaliperMetaData("teststring", "teststring");
+  serac::profiling::terminateCaliper();
+  
   MPI_Finalize();
 
   return 0;
