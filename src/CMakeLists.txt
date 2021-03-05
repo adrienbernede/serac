@@ -7,6 +7,6 @@
 add_subdirectory(serac)
 add_subdirectory(drivers)
 
-if (ENABLE_DOCS)
+if ("$(CMAKE_BINARY_DIR)" STREQUAL "$(PROJECT_BINARY_DIR)" AND ENABLE_DOCS)
     add_subdirectory(docs)
 endif()
