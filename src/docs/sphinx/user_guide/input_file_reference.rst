@@ -14,8 +14,8 @@ a subset of these keywords as well.
 Global Keywords
 ---------------
 
-Some keywords are not tied to a particular physics module - typically these
-are used for global configuration options or for the 
+Some keywords are not tied to a particular physics module - these are typically
+global configuration options.
 
 ==============    ===========
 Keyword           Description
@@ -149,3 +149,213 @@ Note that all simulations currently start at ``t = 0``, including restart runs.
 .. code-block:: Lua
 
  t_final = 5
+
+
+Solid Module Keywords
+---------------------
+
+The following keywords are available for configuring Serac's solid mechanics module:
+
+=======================   ===========
+Keyword                   Description
+=======================   ===========
+`boundary_conds`_         List of boundary conditions to apply.
+`density`_                Material density.
+`dynamics`_               Options for mass matrix inversion.
+`equation_solver`_        Linear/nonlinear solver parameters for stiffness matrix.
+`geometric_nonlin`_       Whether to include geometric nonlinearities.
+`initial_displacement`_   The initial state of the displacement field.
+`initial_velocity`_       The initial state of the velocity field.
+`K`_                      Lamé's first parameter, bulk modulus.
+`material_nonlin`_        Whether the material to model is linear elastic.
+`mu`_                     Lamé's second parameter, shear modulus.
+`order`_                  Order of the finite elements/polynomial interpolation.
+`viscosity`_              Material viscosity.
+=======================   ===========
+
+
+Thermal Module Keywords
+-----------------------
+
+The following keywords are available for configuring Serac's thermal conduction module:
+
+=======================   ===========
+Keyword                   Description
+=======================   ===========
+`boundary_conds`_         List of boundary conditions to apply.
+`cp`_                     Material specific heat capacity.
+`dynamics`_               Options for mass matrix inversion.
+`equation_solver`_        Linear/nonlinear solver parameters for stiffness matrix.
+`initial_temperature`_    The initial state of the temperature field.
+`initial_velocity`_       The initial state of the velocity field.
+`kappa`_                  Material thermal conductivity.
+`nonlinear_reaction`_     Options for a nonlinear reaction term.
+`order`_                  Order of the finite elements/polynomial interpolation.
+`rho`_                    Material density.
+=======================   ===========
+
+
+boundary_conds
+--------------
+
+Boundary conditions are defined as a dictionary - the key for a boundary condition must include the name
+of the field on which it should be applied.  Note that only one of ``scalar_function``, ``vector_function``,
+``constant``, ``vector_constant``, and ``piecewise_constant`` can be defined for a given boundary condition.
+The following fields are available for each element of the dictionary:
+
+**boundary_cond.attrs**
+
+The mesh attributes on which the boundary condition should be applied.
+
+.. code-block:: Lua
+
+  thermal_conduction = {
+    boundary_conds {
+      ['temperature'] = {
+        attrs = {1, 2, 3}
+      }
+    }
+  }
+
+**boundary_cond.component**
+
+The vector component on which to apply a scalar coefficient.
+
+.. code-block:: Lua
+
+  thermal_conduction = {
+    boundary_conds {
+      ['temperature'] = {
+        component = 1
+      }
+    }
+  }
+
+**boundary_cond.constant**
+
+The scalar used to define an ``mfem::ConstantCoefficient``.
+
+.. code-block:: Lua
+
+  thermal_conduction = {
+    boundary_conds {
+      ['temperature'] = {
+        constant = 2.5
+      }
+    }
+  }
+
+**boundary_cond.piecewise_constant**
+
+The scalar used to define an ``mfem::PWConstCoefficient`` that maps mesh attributes to constants.
+
+.. code-block:: Lua
+
+  thermal_conduction = {
+    boundary_conds {
+      ['temperature'] = {
+        piecewise_constant = {
+          [1] = 3.0,
+          [4] = 6.1
+        }
+      }
+    }
+  }
+
+**boundary_cond.scalar_function**
+
+The function used to define an ``mfem::FunctionCoefficient``.  Note that if the function is not
+time-dependent, accepting a second parameter for time is not required.
+
+.. code-block:: Lua
+
+  thermal_conduction = {
+    boundary_conds {
+      ['temperature'] = {
+        scalar_function = function(v, t)
+          return v:norm() * t
+        end
+      }
+    }
+  }
+
+**boundary_cond.vector_constant**
+
+The scalar used to define an ``mfem::VectorConstantCoefficient``.
+
+.. code-block:: Lua
+
+  thermal_conduction = {
+    boundary_conds {
+      ['temperature'] = {
+        vector_constant = {
+          x = 0.0,
+          y = 0.0,
+          z = 0.0
+        }
+      }
+    }
+  }
+
+**boundary_cond.vector_function**
+
+The function used to define an ``mfem::VectorFunctionCoefficient``.  Note that if the function is not
+time-dependent, accepting a second parameter for time is not required.
+
+.. code-block:: Lua
+
+  thermal_conduction = {
+    boundary_conds {
+      ['temperature'] = {
+        vector_function = function(v, t)
+          return v * t
+        end
+      }
+    }
+  }
+
+**boundary_cond.vector_piecewise_constant**
+
+The scalar used to define an ``mfem::VectorArrayCoefficient`` that maps mesh attributes to constants.
+
+.. code-block:: Lua
+
+  thermal_conduction = {
+    boundary_conds {
+      ['temperature'] = {
+        vector_piecewise_constant = {
+          [1] = {
+            x = 1.0,
+            y = 0.5,
+            z = 0.0
+          },
+          [4] = {
+            x = 2.5,
+            y = 0.25,
+            z = 1.0
+          }
+        }
+      }
+    }
+  }
+
+
+equation_solver
+---------------
+
+Wraps an ``mfem::Solver`` - underlying solver can be linear or nonlinear dependending on whether the ``nonlinear`` options are specified.
+
+**equation_solver.linear.type**
+
+Can be ``iterative`` or ``direct`` (for SuperLU).  ``linear.iterative_options`` is used when ``iterative`` is selected,
+and ``linear.direct_options`` is used when ``direct`` is selected.
+
+.. code-block:: Lua
+
+  thermal_conduction = {
+    equation_solver = {
+      linear = {
+        type = 'iterative'
+      }
+    }
+  }

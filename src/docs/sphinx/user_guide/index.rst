@@ -13,6 +13,7 @@ User Guide
 
   simple_conduction_tutorial
   input_schema
+  input_file_reference
 
 Serac can be used either by providing input files to the main executable or through a C++ API. Example lua input files are located in the `data 
 directory <https://github.com/LLNL/serac/tree/develop/data/input_files>`_ and examples of how to use the C++ API are located in the `tests directory 
