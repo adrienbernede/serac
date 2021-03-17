@@ -3,6 +3,8 @@
 .. ##
 .. ## SPDX-License-Identifier: (BSD-3-Clause)
 
+.. _simple-conduction-label:
+
 ##########################
 Simple Conduction Tutorial
 ##########################
