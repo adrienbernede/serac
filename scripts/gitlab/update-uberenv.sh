@@ -7,7 +7,6 @@ else
     uberenv_ref="${1}"
 fi
 
-uberenv_file="scripts/uberenv/uberenv.py"
-uberenv_master="https://raw.githubusercontent.com/LLNL/uberenv/${uberenv_ref}/uberenv.py"
-
-curl --fail --output ${uberenv_file} ${uberenv_master}
+cd scripts/uberenv
+git fetch origin
+git checkout ${uberenv_ref}
