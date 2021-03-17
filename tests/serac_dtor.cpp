@@ -30,11 +30,12 @@ TEST(serac_dtor, test1)
   axom::sidre::DataStore datastore;
   serac::StateManager::initialize(datastore);
 
-  auto pmesh = buildMeshFromFile(mesh_file, 1, 0);
+  auto pmesh = mesh::refineAndDistribute(buildMeshFromFile(mesh_file), 1, 0);
   serac::StateManager::setMesh(std::move(pmesh));
 
   // Initialize the second order thermal solver on the parallel mesh
-  auto therm_solver = std::make_unique<ThermalConduction>(2, ThermalConduction::defaultQuasistaticOptions());
+  auto therm_solver =
+      std::make_unique<ThermalConduction>(2, ThermalConduction::defaultQuasistaticOptions(), "first_thermal");
 
   // Initialize the temperature boundary condition
   auto u_0 = std::make_shared<mfem::FunctionCoefficient>([](const mfem::Vector& x) { return x.Norml2(); });
@@ -52,7 +53,7 @@ TEST(serac_dtor, test1)
   therm_solver->completeSetup();
 
   // Destruct the old thermal solver and build a new one
-  therm_solver.reset(new ThermalConduction(1, ThermalConduction::defaultQuasistaticOptions()));
+  therm_solver.reset(new ThermalConduction(1, ThermalConduction::defaultQuasistaticOptions(), "second_thermal"));
 
   // Destruct the second thermal solver and leave the pointer empty
   therm_solver.reset(nullptr);
