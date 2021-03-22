@@ -8,6 +8,12 @@
 # Tests for Serac objects 
 #------------------------------------------------------------------------------
 
+add_library(fake_utils mesh_manager.cpp)
+target_link_libraries(fake_utils axom)
+
+add_executable(par_bug mesh_bug.cpp)
+target_link_libraries(par_bug fake_utils)
+
 if (ENABLE_GTEST)
 
     set(test_dependencies serac_physics serac_coefficients test_utils)
