@@ -1,6 +1,6 @@
 #include "mfem.hpp"
 #include "parvariationalform.hpp"
-#include "qfuncintegrator.hpp"
+#include "l2qfuncintegrator.hpp"
 #include "tensor.hpp"
 #include <fstream>
 #include <iostream>
@@ -14,13 +14,6 @@ using namespace mfem;
 
 #include "axom/slic/core/SimpleLogger.hpp"
 
-// solve an equation of the form (with `dim` dofs per node)
-// (a * M + b * K) x == f
-// 
-// where M is the H1 mass matrix 
-//       K is the H1 stiffness matrix 
-//       f is some load term
-// 
 int main(int argc, char* argv[])
 {
   int num_procs, myid;
@@ -34,8 +27,6 @@ int main(int argc, char* argv[])
 
   int         order       = 1;
   int         refinements = 0;
-  double a = 0.0;
-  double b = 1.0;
   // SERAC EDIT BEGIN
   // double p = 5.0;
   // SERAC EDIT END
@@ -58,60 +49,45 @@ int main(int argc, char* argv[])
   }
 
   Mesh mesh(mesh_file, 1, 1);
-  int dim = mesh.Dimension();
   for (int l = 0; l < refinements; l++) {
     mesh.UniformRefinement();
   }
 
   ParMesh pmesh(MPI_COMM_WORLD, mesh);
 
-  auto fec = H1_FECollection(order, dim);
-  ParFiniteElementSpace fespace(&pmesh, &fec, dim);
+  auto fec = L2_FECollection(order, pmesh.Dimension());
+  ParFiniteElementSpace fespace(&pmesh, &fec);
 
   ParBilinearForm A(&fespace);
 
-  ConstantCoefficient a_coef(a);
-  A.AddDomainIntegrator(new VectorMassIntegrator(a_coef));
+  ConstantCoefficient coef(1.0);
+  A.AddDomainIntegrator(new MassIntegrator(coef));
 
-  ConstantCoefficient lambda_coef(b);
-  ConstantCoefficient mu_coef(b);
-  A.AddDomainIntegrator(new ElasticityIntegrator(lambda_coef, mu_coef));
   A.Assemble(0);
   A.Finalize();
   std::unique_ptr<mfem::HypreParMatrix> J(A.ParallelAssemble());
 
   LinearForm f(&fespace);
-  VectorFunctionCoefficient load_func(dim, [&](const Vector& /*coords*/, Vector & force) {
-    force = 0.0;
-    force(dim - 1) = -1.0;
+  FunctionCoefficient load_func([&](const Vector& coords) {
+    return 100 * coords(0) * coords(1);
   });
 
-  f.AddDomainIntegrator(new VectorDomainLFIntegrator(load_func));
+  f.AddDomainIntegrator(new DomainLFIntegrator(load_func));
   f.Assemble();
 
-  VectorFunctionCoefficient boundary_func(dim, [&](const Vector& /*coords*/, Vector & u) {
-    //double x = coords(0);
-    //double y = coords(1);
-    u = 0.0;
+  FunctionCoefficient boundary_func([&](const Vector& coords) {
+    double x = coords(0);
+    double y = coords(1);
+    return 1 + x + 2 * y;
   });
 
-  Array<int> ess_bdr(pmesh.bdr_attributes.Max());
-  ess_bdr = 1;
-  Array<int> ess_tdof_list;
-  fespace.GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
   ParGridFunction x(&fespace);
   x = 0.0;
-  x.ProjectBdrCoefficient(boundary_func, ess_bdr);
-  J->EliminateRowsCols(ess_tdof_list);
-
   auto residual = serac::mfem_ext::StdFunctionOperator(
     fespace.TrueVSize(),
 
     [&](const mfem::Vector& u, mfem::Vector& r) {
       r = A * u - f;
-      for (int i = 0; i < ess_tdof_list.Size(); i++) {
-        r(ess_tdof_list[i]) = 0.0;
-      }
     },
 
     [&](const mfem::Vector & /*du_dt*/) -> mfem::Operator& {
@@ -141,8 +117,30 @@ int main(int argc, char* argv[])
 
   x.Distribute(X);
 
+  ParVariationalForm form(&fespace);
+
+  auto tmp = new L2QFunctionIntegrator(
+      [&](auto x, auto u) {
+        return u - (100 * x[0] * x[1]);
+      }, pmesh);
+
+  form.AddDomainIntegrator(tmp);
+
+  ParGridFunction x2(&fespace);
+  Vector X2(fespace.TrueVSize());
+  x2 = 0.0;
+
+  newton.SetOperator(form);
+
+  x2.GetTrueDofs(X2);
+  newton.Mult(zero, X2);
+
+  x2.Distribute(X2);
+
   mfem::ConstantCoefficient zero_coef(0.0);
+  std::cout << "relative error: " << mfem::Vector(x - x2).Norml2() / x.Norml2() << std::endl;
   std::cout << x.ComputeL2Error(zero_coef) << std::endl;
+  std::cout << x2.ComputeL2Error(zero_coef) << std::endl;
 
   char         vishost[] = "localhost";
   int          visport   = 19916;
@@ -150,6 +148,11 @@ int main(int argc, char* argv[])
   sol_sock << "parallel " << num_procs << " " << myid << "\n";
   sol_sock.precision(8);
   sol_sock << "solution\n" << pmesh << x << flush;
+
+  socketstream sol_sock2(vishost, visport);
+  sol_sock2 << "parallel " << num_procs << " " << myid << "\n";
+  sol_sock2.precision(8);
+  sol_sock2 << "solution\n" << pmesh << x2 << flush;
 
   MPI_Finalize();
 

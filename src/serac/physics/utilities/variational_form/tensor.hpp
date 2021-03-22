@@ -2,9 +2,36 @@
 
 #include "dual.hpp"
 #include "array.hpp"
+#include "dimensions.hpp"
 
 #include "detail/meta.h"
 #include "detail/for_constexpr.h"
+
+namespace impl {
+  template < typename T, typename i0_t >
+  constexpr auto get(const T & values, i0_t i0) { return values[i0]; }
+
+  template < typename T, typename i0_t, typename i1_t >
+  constexpr auto get(const T & values, i0_t i0, i1_t i1) { return values[i0][i1]; }
+
+  template < typename T, typename i0_t, typename i1_t, typename i2_t >
+  constexpr auto get(const T & values, i0_t i0, i1_t i1, i2_t i2) { return values[i0][i1][i2]; }
+
+  template < typename T, typename i0_t, typename i1_t, typename i2_t, typename i3_t >
+  constexpr auto get(const T & values, i0_t i0, i1_t i1, i2_t i2, i3_t i3) { return values[i0][i1][i2][i3]; }
+
+  template < typename T, typename i0_t >
+  constexpr auto & get(T & values, i0_t i0) { return values[i0]; }
+
+  template < typename T, typename i0_t, typename i1_t >
+  constexpr auto & get(T & values, i0_t i0, i1_t i1) { return values[i0][i1]; }
+
+  template < typename T, typename i0_t, typename i1_t, typename i2_t >
+  constexpr auto & get(T & values, i0_t i0, i1_t i1, i2_t i2) { return values[i0][i1][i2]; }
+
+  template < typename T, typename i0_t, typename i1_t, typename i2_t, typename i3_t >
+  constexpr auto & get(T & values, i0_t i0, i1_t i1, i2_t i2, i3_t i3) { return values[i0][i1][i2][i3]; }
+}
 
 template < typename T, int ... n >
 struct tensor;
@@ -16,6 +43,16 @@ struct tensor<T> {
   static constexpr int shape[1] = {0};
   constexpr auto& operator()(array< int, ndim >) { return value; }
   constexpr auto operator()(array< int, ndim >) const { return value; }
+
+  template < typename ... S >
+  constexpr auto & operator()(S...) { return value; }
+
+  template < typename ... S >
+  constexpr auto operator()(S...) const { return value; }
+
+
+  tensor () : value{} {}
+  tensor (T v) : value(v) {}
   operator T() { return value; }
   T value;
 };
@@ -25,13 +62,13 @@ struct tensor<T, n> {
   using type = T;
   static constexpr int ndim = 1;
   static constexpr int shape[ndim] = {n};
-  template < typename S, typename = std::enable_if_t<std::is_integral<S>::value> > 
-  constexpr auto& operator()(array< S, 1 > i) { return value[i[0]]; } 
-  template < typename S, typename = std::enable_if_t<std::is_integral<S>::value> > 
-  constexpr auto operator()(array< S, 1 > i) const { return value[i[0]]; } 
 
-  constexpr auto& operator()(array< int, ndim > i) { return operator()<int>(i); }
-  constexpr auto operator()(array< int, ndim > i) const { return operator()<int>(i); }
+  template < typename S >
+  constexpr auto & operator()(S i) { return impl::get(value, i); }
+
+  template < typename S >
+  constexpr auto operator()(S i) const { return impl::get(value, i); }
+
   constexpr auto& operator[](int i) { return value[i]; };
   constexpr auto operator[](int i) const { return value[i]; };
   T value[n];
@@ -42,24 +79,12 @@ struct tensor<T, first, rest...> {
   using type = T;
   static constexpr int ndim = 1 + sizeof ... (rest);
   static constexpr int shape[ndim] = {first, rest...};
-  template < typename S, typename = std::enable_if_t<std::is_integral<S>::value> > 
-  constexpr auto& operator()(array< S, ndim > i) { 
-    if constexpr (ndim == 2) { return value[i[0]][i[1]]; } 
-    if constexpr (ndim == 3) { return value[i[0]][i[1]][i[2]]; } 
-    if constexpr (ndim == 4) { return value[i[0]][i[1]][i[2]][i[3]]; } 
-    if constexpr (ndim == 5) { return value[i[0]][i[1]][i[2]][i[3]][i[4]]; } 
-  };
 
-  template < typename S, typename = std::enable_if_t<std::is_integral<S>::value> > 
-  constexpr auto operator()(array< S, ndim > i) const { 
-    if constexpr (ndim == 2) { return value[i[0]][i[1]]; } 
-    if constexpr (ndim == 3) { return value[i[0]][i[1]][i[2]]; } 
-    if constexpr (ndim == 4) { return value[i[0]][i[1]][i[2]][i[3]]; } 
-    if constexpr (ndim == 5) { return value[i[0]][i[1]][i[2]][i[3]][i[4]]; } 
-  };
+  template < typename ... S >
+  constexpr auto & operator()(S ... i) { return impl::get(value, i...); };
 
-  constexpr auto& operator()(array< int, ndim > i) { return operator()<int>(i); }
-  constexpr auto operator()(array< int, ndim > i) const { return operator()<int>(i); }
+  template < typename ... S >
+  constexpr auto operator()(S ... i) const { return impl::get(value, i...); };
 
   constexpr auto& operator[](int i) { return value[i]; };
   constexpr auto operator[](int i) const { return value[i]; };
@@ -72,6 +97,49 @@ tensor(const T (& data)[n1]) -> tensor<T, n1>;
 template < typename T, int n1, int n2 >
 tensor(const T (& data)[n1][n2]) -> tensor<T, n1, n2>;
 
+template < typename T, int ... n >
+constexpr auto dimensions_of(tensor< T, n ... >) { return Dimensions<n...>{}; }
+
+struct zero{
+  operator double() { return 0.0; }
+ 
+  template < typename T, int ... n >
+  operator tensor<T,n...>() { return tensor<T,n...>{}; }
+
+  template < typename ... T >
+  auto operator()(T ...) { return zero{}; }
+
+  template < typename T >
+  auto operator=(T) { return zero{}; }
+}; 
+
+constexpr auto operator+(zero, zero) { return zero{}; }
+
+template < typename T >
+constexpr auto operator+(zero, T other) { return other; }
+
+template < typename T >
+constexpr auto operator+(T other, zero) { return other; }
+
+/////////////////////////////////////////////////
+
+constexpr auto operator-(zero, zero) { return zero{}; }
+
+template < typename T >
+constexpr auto operator-(zero, T other) { return -other; }
+
+template < typename T >
+constexpr auto operator-(T other, zero) { return other; }
+
+/////////////////////////////////////////////////
+
+constexpr auto operator*(zero, zero) { return zero{}; }
+
+template < typename T >
+constexpr auto operator*(zero, T /*other*/) { return zero{}; }
+
+template < typename T >
+constexpr auto operator*(T /*other*/, zero) { return zero{}; }
 
 // reduced_tensor removes 1s from tensor dimensions
 template < typename T, int n1, int n2 = 1 >
@@ -103,7 +171,11 @@ template < int ... n, typename lambda_type >
 constexpr auto make_tensor(lambda_type f) {
   using T = typename std::invoke_result_t<lambda_type, impl::always_int<n>...>;
   tensor<T,n...> A{};
-  for_constexpr<n...>([&](auto ... i){ A({i...}) = f(i...); });
+  if constexpr (sizeof ... (n) == 0) {
+    A.value = f();
+  } else {
+    for_constexpr<n...>([&](auto ... i){ A(i...) = f(i...); });
+  }
   return A;
 }
 
@@ -330,6 +402,19 @@ constexpr auto dot(tensor< S, n > A, tensor< T, n > B) {
   return AB;
 }
 
+template < typename S, typename T, int m, int n, int p >
+constexpr auto dot(tensor< S, m, n, p > A, tensor< T, p > B) {
+  tensor< decltype(S{} * T{}), m, n > AB{};
+  for (int i = 0; i < m; i++) {
+    for (int j = 0; j < n; j++) {
+      for (int k = 0; k < p; k++) {
+        AB[i][j] += A[i][j][k] * B[k];
+      }
+    }
+  }
+  return AB;
+}
+
 template < typename S, typename T, typename U, int m, int n >
 constexpr auto dot(tensor< S, m > u, tensor< T, m, n > A, tensor< U, n > v) {
   decltype(S{} * T{} * U{}) uAv{};
@@ -342,18 +427,42 @@ constexpr auto dot(tensor< S, m > u, tensor< T, m, n > A, tensor< U, n > v) {
 }
 
 template < typename S, typename T, int m, int n, int p, int q >
-constexpr auto ddot(tensor< S, m, n, p, q > A, tensor< T, p, q > v) {
-  tensor< decltype(S{} * T{}), m, n > Av{};
+constexpr auto ddot(tensor< S, m, n, p, q > A, tensor< T, p, q > B) {
+  tensor< decltype(S{} * T{}), m, n > AB{};
   for (int i = 0; i < m; i++) {
     for (int j = 0; j < n; j++) {
       for (int k = 0; k < p; k++) {
         for (int l = 0; l < q; l++) {
-          Av[i][j] += A[i][j][k][l] * v[k][l];
+          AB[i][j] += A[i][j][k][l] * B[k][l];
         }
       }
     }
   }
-  return Av;
+  return AB;
+}
+
+template < typename S, typename T, int m, int n, int p >
+constexpr auto ddot(tensor< S, m, n, p > A, tensor< T, n, p > B) {
+  tensor< decltype(S{} * T{}), m > AB{};
+  for (int i = 0; i < m; i++) {
+    for (int j = 0; j < n; j++) {
+      for (int k = 0; k < p; k++) {
+        AB[i] += A[i][j][k] * B[j][k];
+      }
+    }
+  }
+  return AB;
+}
+
+template < typename S, typename T, int m, int n >
+constexpr auto ddot(tensor< S, m, n > A, tensor< T, m, n > B) {
+  decltype(S{} * T{}) AB{};
+  for (int i = 0; i < m; i++) {
+    for (int j = 0; j < n; j++) {
+      AB += A[i][j] * B[i][j];
+    }
+  }
+  return AB;
 }
 
 template < typename S, typename T, int m, int n, int p >
@@ -652,36 +761,195 @@ constexpr auto chop(tensor< double, m, n > A) {
   return copy;
 }
 
-template < int n >
-auto derivative_wrt(tensor < double, n > A) {
-  tensor< dual< tensor< double, n > >, n > A_dual{};
-  for (int i = 0; i < n; i++) {
-    A_dual[i].value = A[i];
-    A_dual[i].gradient[i] = 1.0;
-  }
-  return A_dual;
-}
-
-template < int m, int n >
-auto derivative_wrt(tensor < double, m, n > A) {
-  tensor< dual< tensor< double, m, n > >, m, n > A_dual{};
-  for (int i = 0; i < m; i++) {
-    for (int j = 0; j < n; j++) {
-      A_dual[i][j].value = A[i][j];
-      A_dual[i][j].gradient[i][j] = 1.0;
-    }
-  }
-  return A_dual;
-}
-
-constexpr auto make_dual(double x) { return dual{x, 1.0}; }
-
 template < int ... n >
 constexpr auto make_dual(tensor< double, n...> A){
   tensor < dual < tensor< double, n... > >, n... > A_dual{};
   for_constexpr<n...>([&](auto ... i){
-    A_dual({i...}).value = A({i...});
-    A_dual({i...}).gradient({i...}) = 1.0;
+    A_dual(i...).value = A(i...);
+    A_dual(i...).gradient(i...) = 1.0;
   });
   return A_dual;
+}
+
+template < typename T >
+struct underlying{
+  using type = void;
+};
+
+template < typename T, int ... n >
+struct underlying < tensor < T, n ... > >{
+  using type = T;
+};
+
+template <>
+struct underlying < double >{
+  using type = double;
+};
+
+namespace impl {
+
+  template < typename T1, typename T2 >
+  struct outer_prod;
+
+  template < int ... m, int ... n >
+  struct outer_prod< tensor< double, m ... >, tensor< double, n ... > >{
+    using type = tensor< double, m ..., n ... >;
+  };
+
+  template < int ... n >
+  struct outer_prod< double, tensor< double, n ... > >{
+    using type = tensor< double, n ... >;
+  };
+
+  template < int ... n >
+  struct outer_prod< tensor< double, n ... >, double >{
+    using type = tensor< double, n ... >;
+  };
+
+  template <>
+  struct outer_prod< double, double >{
+    using type = tensor< double >;
+  };
+
+  template < typename T >
+  struct outer_prod< zero, T >{
+    using type = zero;
+  };
+
+  template < typename T >
+  struct outer_prod< T, zero >{
+    using type = zero;
+  };
+
+}
+
+template < typename T1, typename T2 >
+using outer_product_t = typename impl::outer_prod<T1, T2>::type;
+
+template < typename ... T >
+auto get_gradient(dual< std::tuple < T ... > > arg) {
+  return std::apply([](auto ... each_value){
+    return std::tuple{each_value ...};
+  }, arg.gradient);
+}
+
+template < typename T, int ... n >
+void get_gradient(tensor< dual< double >, n ... > arg) {
+  tensor< double, n ... > g{};
+  for_constexpr< n ... >([&](auto ... i){
+    g[{i...}] = arg[{i...}].gradient;
+  });
+  return g;
+}
+
+template < typename ... T, int ... n >
+auto get_gradient(tensor< dual< std::tuple < T ... > >, n ... > arg) {
+  std::tuple < outer_product_t< tensor< double, n... >, T > ... > g{};
+  for_constexpr< n ... >([&](auto ... i){
+    for_constexpr< sizeof ... (T) >([&](auto j){
+      std::get<j>(g)(i...) = std::get<j>(arg(i...).gradient);
+    });
+  });
+  return g;
+}
+
+template < typename T, int ... n, int ... m >
+auto get_gradient(tensor< dual< tensor< double, m ... > >, n ... > arg) {
+  tensor< double, n ..., m... > g{};
+  for_constexpr< n ... >([&](auto ... i){
+    g[{i...}] = arg[{i...}].gradient;
+  });
+  return g;
+}
+
+template < typename ... T >
+auto get_gradient(std::tuple < T ... > tuple_of_values) {
+  return std::apply([](auto ... each_value){
+    return std::tuple{get_gradient(each_value) ...};
+  }, tuple_of_values);
+}
+
+template < typename T, int ... n, int ... m >
+auto get_value(dual< T > arg) {
+  return arg.value;
+}
+
+template < typename T, int ... n, int ... m >
+auto get_value(tensor< dual< T >, n ... > arg) {
+  tensor< double, n ...> value{};
+  for_constexpr< n ... >([&](auto ... i){
+    value(i...) = arg(i...).value;
+  });
+  return value;
+}
+
+template < typename ... T >
+auto get_value(std::tuple < T ... > tuple_of_values) {
+  return std::apply([](auto ... each_value){
+    return std::tuple{get_value(each_value) ...};
+  }, tuple_of_values);
+}
+
+constexpr auto chain_rule(const zero /* df_dx */, const zero /* dx */) { return zero{}; }
+
+template < typename T >
+constexpr auto chain_rule(const zero /* df_dx */, const T /* dx */) { return zero{}; }
+
+template < typename T >
+constexpr auto chain_rule(const T /* df_dx */, const zero /* dx */) { return zero{}; }
+
+constexpr auto chain_rule(const double df_dx, const double dx) { return df_dx * dx; }
+
+template < int ... n >
+constexpr auto chain_rule(const tensor < double, n ... > df_dx, const double dx) { return df_dx * dx; }
+
+template < int ... n >
+constexpr auto chain_rule(const tensor < double, n ... > df_dx, const tensor< double, n... > dx) {
+  double total{};
+  for_constexpr < n ... >([&](auto ... i){ total += df_dx(i...) * dx(i...); });
+  return total;
+}
+
+template < int m, int ... n >
+constexpr auto chain_rule(tensor < double, m, n ... > df_dx, tensor< double, n... > dx) {
+  tensor< double, m > total{};
+  for (int i = 0; i < m; i++) {
+    total[i] = chain_rule(df_dx[i], dx);
+  }
+  return total;
+}
+
+template < int m, int n, int ... p>
+auto chain_rule(tensor < double, m, n, p ... > df_dx, tensor< double, p... > dx) {
+  tensor< double, m, n > total{};
+  for (int i = 0; i < m; i++) {
+    for (int j = 0; j < n; j++) {
+      total[i][j] = chain_rule(df_dx[i][j], dx);
+    }
+  }
+  return total;
+}
+
+template < typename ... T, typename ... S, int ... I >
+auto chain_rule_helper(std::tuple < T ... > df_dx, std::tuple < S ... > dx, std::integer_sequence<int, I...>) {
+  return (chain_rule(std::get<I>(df_dx), std::get<I>(dx)) + ...);
+}
+
+template < typename ... T, typename ... S >
+auto chain_rule(std::tuple < T ... > df_dx, std::tuple < S ... > dx) {
+  static_assert(sizeof ... (T) == sizeof ... (S));
+  return chain_rule_helper(df_dx, dx, std::make_integer_sequence<int, sizeof ...(T)>());
+}
+
+template < int rank, typename ... T, typename S >
+auto chain_rule(std::tuple < T ... > df_dx, S dx) {
+  if constexpr (rank == 1) {
+    return std::apply([&](auto ... each_component_of_df_dx){
+      return (chain_rule(each_component_of_df_dx, dx) + ...);
+    }, df_dx);
+  } else {
+    return std::apply([&](auto ... each_component_of_df_dx){
+      return std::tuple{chain_rule(each_component_of_df_dx, dx) ... };
+    }, df_dx);
+  }
 }

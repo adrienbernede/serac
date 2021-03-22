@@ -1,6 +1,6 @@
 #include "mfem.hpp"
 #include "parvariationalform.hpp"
-#include "qfuncintegrator.hpp"
+#include "vectorh1qfuncintegrator.hpp"
 #include "tensor.hpp"
 #include <fstream>
 #include <iostream>
@@ -8,17 +8,17 @@
 #include "serac/serac_config.hpp"
 #include "serac/physics/operators/stdfunction_operator.hpp"
 #include "serac/numerics/expr_template_ops.hpp"
-#include "axom/slic/core/SimpleLogger.hpp"
-#include "serac/infrastructure/profiling.hpp"
 
 using namespace std;
 using namespace mfem;
 
-// solve an equation of the form
+#include "axom/slic/core/SimpleLogger.hpp"
+
+// solve an equation of the form (with `dim` dofs per node)
 // (a * M + b * K) x == f
 // 
-// where M is the H1 mass matrix
-//       K is the H1 stiffness matrix
+// where M is the H1 mass matrix 
+//       K is the H1 stiffness matrix 
 //       f is some load term
 // 
 int main(int argc, char* argv[])
@@ -29,7 +29,6 @@ int main(int argc, char* argv[])
   MPI_Comm_rank(MPI_COMM_WORLD, &myid);
 
   axom::slic::SimpleLogger logger;
-  serac::profiling::initializeCaliper();
 
   const char * mesh_file = SERAC_REPO_DIR"/data/meshes/star.mesh";
 
@@ -58,41 +57,50 @@ int main(int argc, char* argv[])
     args.PrintOptions(cout);
   }
 
-  SERAC_MARK_START("main");
-  
   Mesh mesh(mesh_file, 1, 1);
+  int dim = mesh.Dimension();
   for (int l = 0; l < refinements; l++) {
     mesh.UniformRefinement();
   }
 
   ParMesh pmesh(MPI_COMM_WORLD, mesh);
 
-  auto fec = H1_FECollection(order, pmesh.Dimension());
-  ParFiniteElementSpace fespace(&pmesh, &fec);
+  auto fec = H1_FECollection(order, dim);
+  ParFiniteElementSpace fespace(&pmesh, &fec, dim);
 
+  //ParNonlinearForm A(&fespace);
   ParBilinearForm A(&fespace);
 
   ConstantCoefficient a_coef(a);
-  A.AddDomainIntegrator(new MassIntegrator(a_coef));
+  A.AddDomainIntegrator(new VectorMassIntegrator(a_coef));
 
-  ConstantCoefficient b_coef(b);
-  A.AddDomainIntegrator(new DiffusionIntegrator(b_coef));
+  ConstantCoefficient lambda_coef(b);
+  ConstantCoefficient mu_coef(b);
+  A.AddDomainIntegrator(new ElasticityIntegrator(lambda_coef, mu_coef));
   A.Assemble(0);
   A.Finalize();
   std::unique_ptr<mfem::HypreParMatrix> J(A.ParallelAssemble());
 
   LinearForm f(&fespace);
-  FunctionCoefficient load_func([&](const Vector& coords) {
-    return 100 * coords(0) * coords(1);
+  VectorFunctionCoefficient load_func(dim, [&](const Vector& /*coords*/, Vector & force) {
+    force = 0.0;
+    force(0) = -1.0;
   });
 
-  f.AddDomainIntegrator(new DomainLFIntegrator(load_func));
+  f.AddDomainIntegrator(new VectorDomainLFIntegrator(load_func));
   f.Assemble();
 
-  FunctionCoefficient boundary_func([&](const Vector& coords) {
+  VectorFunctionCoefficient boundary_func(dim, [&](const Vector& /*coords*/, Vector & u) {
+    //double x = coords(0);
+    //double y = coords(1);
+    u = 0.0;
+  });
+
+  VectorFunctionCoefficient initial_displacement(dim, [&](const Vector& coords, Vector & u) {
     double x = coords(0);
     double y = coords(1);
-    return 1 + x + 2 * y;
+    u(0) = x + 3 * y * y;
+    u(1) = 2 * x - y;
   });
 
   Array<int> ess_bdr(pmesh.bdr_attributes.Max());
@@ -102,6 +110,8 @@ int main(int argc, char* argv[])
   ParGridFunction x(&fespace);
   x = 0.0;
   x.ProjectBdrCoefficient(boundary_func, ess_bdr);
+
+  x.ProjectCoefficient(initial_displacement); // DEBUG
   J->EliminateRowsCols(ess_tdof_list);
 
   auto residual = serac::mfem_ext::StdFunctionOperator(
@@ -114,7 +124,7 @@ int main(int argc, char* argv[])
       }
     },
 
-    [&](const mfem::Vector & /*du_dt*/) -> mfem::Operator& {
+    [&](const mfem::Vector & /*u*/) -> mfem::Operator& {
       return *J;
     }
   );
@@ -143,12 +153,15 @@ int main(int argc, char* argv[])
 
   ParVariationalForm form(&fespace);
 
-  auto tmp = new QFunctionIntegrator(
-      [&](auto x, auto u, auto du) {
-        auto f0 = a * u - (100 * x[0] * x[1]);
-        auto f1 = b * du;
-        return std::tuple{f0, f1};
-      }, pmesh);
+  static constexpr auto I = Identity<2>();
+
+  auto tmp = new VectorH1QFunctionIntegrator(
+    [&](auto /*x*/, auto u, auto grad_u) {
+      auto f0 = a * u - tensor{{-1.0, 0.0}};
+      auto strain = 0.5 * (grad_u + transpose(grad_u));
+      auto f1 = b * tr(strain) * I + 2.0 * b * strain;
+      return std::tuple{f0, f1};
+    }, pmesh);
 
   form.AddDomainIntegrator(tmp);
 
@@ -159,6 +172,8 @@ int main(int argc, char* argv[])
   x2 = 0.0;
   x2.ProjectBdrCoefficient(boundary_func, ess_bdr);
 
+  x2.ProjectCoefficient(initial_displacement); // DEBUG
+
   newton.SetOperator(form);
 
   x2.GetTrueDofs(X2);
@@ -167,7 +182,7 @@ int main(int argc, char* argv[])
   x2.Distribute(X2);
 
   mfem::ConstantCoefficient zero_coef(0.0);
-  std::cout << "error: " << mfem::Vector(x - x2).Norml2() << std::endl;
+  std::cout << "relative error: " << mfem::Vector(x - x2).Norml2() / x.Norml2() << std::endl;
   std::cout << x.ComputeL2Error(zero_coef) << std::endl;
   std::cout << x2.ComputeL2Error(zero_coef) << std::endl;
 
@@ -178,15 +193,6 @@ int main(int argc, char* argv[])
   sol_sock.precision(8);
   sol_sock << "solution\n" << pmesh << x << flush;
 
-  socketstream sol_sock2(vishost, visport);
-  sol_sock2 << "parallel " << num_procs << " " << myid << "\n";
-  sol_sock2.precision(8);
-  sol_sock2 << "solution\n" << pmesh << x2 << flush;
-
-  SERAC_MARK_END("main");
-  serac::profiling::setCaliperMetaData("teststring", "teststring");
-  serac::profiling::terminateCaliper();
-  
   MPI_Finalize();
 
   return 0;

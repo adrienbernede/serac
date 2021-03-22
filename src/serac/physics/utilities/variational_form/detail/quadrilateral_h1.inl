@@ -1,8 +1,7 @@
-template <PolynomialDegree degree, int c>
-struct finite_element<Geometry::Quadrilateral, Family::H1, degree, c> {
+template <int p, int c>
+struct finite_element<Geometry::Quadrilateral, H1<p, c> > {
   static constexpr auto geometry   = Geometry::Quadrilateral;
   static constexpr auto family     = Family::H1;
-  static constexpr int  p          = static_cast<int>(degree);
   static constexpr int  components = c;
   static constexpr int  dim        = 2;
   static constexpr int  ndof       = (p + 1) * (p + 1);
@@ -41,15 +40,11 @@ struct finite_element<Geometry::Quadrilateral, Family::H1, degree, c> {
     return dN;
   }
 
-  template <Evaluation op = Evaluation::Interpolate>
-  static auto evaluate(tensor<double, ndof> /*values*/, double /*xi*/, int /*i*/)
+  static auto evaluate(tensor<double, c, ndof> values, tensor<double, dim> xi)
   {
-    if constexpr (op == Evaluation::Interpolate) {
-      return double{};
-    }
-
-    if constexpr (op == Evaluation::Gradient) {
-      return double{};
-    }
+    return std::tuple {
+      dot(values, shape_functions(xi)),
+      dot(values, shape_function_gradients(xi))
+    };
   }
 };

@@ -17,4 +17,4 @@ namespace impl {
 template < int ... n, typename lambda >
 inline constexpr void for_constexpr(lambda && f) {
   impl::for_constexpr(f, std::make_integer_sequence<int, n>{} ...);
-} 
+}

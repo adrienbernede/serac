@@ -4,40 +4,6 @@
 
 #include "tensor.hpp"
 
-struct zero{
-  operator double() { return 0.0; }
- 
-  template < typename T, int ... n >
-  operator tensor<T,n...>() { return tensor<T,n...>{}; }
-}; 
-
-constexpr auto operator+(zero, zero) { return zero{}; }
-
-template < typename T >
-constexpr auto operator+(zero, T other) { return other; }
-
-template < typename T >
-constexpr auto operator+(T other, zero) { return other; }
-
-/////////////////////////////////////////////////
-
-constexpr auto operator-(zero, zero) { return zero{}; }
-
-template < typename T >
-constexpr auto operator-(zero, T other) { return -other; }
-
-template < typename T >
-constexpr auto operator-(T other, zero) { return other; }
-
-/////////////////////////////////////////////////
-
-constexpr auto operator*(zero, zero) { return zero{}; }
-
-template < typename T >
-constexpr auto operator*(zero, T /*other*/) { return zero{}; }
-
-template < typename T >
-constexpr auto operator*(T /*other*/, zero) { return zero{}; }
 
 /////////////////////////////////////////////////
 
@@ -102,8 +68,8 @@ constexpr auto make_dual_helper(tensor< T, n...> arg, std::integer_sequence<int,
   >;
   tensor < dual < gradient_type >, n... > arg_dual{};
   for_constexpr<n...>([&](auto ... j){
-    arg_dual({j...}).value = arg({j...});
-    std::get<I>(arg_dual({j...}).gradient)({j...}) = 1.0;
+    arg_dual(j...).value = arg(j...);
+    std::get<I>(arg_dual(j...).gradient)(j...) = 1.0;
   });
   return arg_dual;
 }
@@ -118,4 +84,9 @@ constexpr auto make_dual_helper(std::tuple< T ... > args, std::integer_sequence<
 template < typename ... T >
 constexpr auto make_dual(T ... args){
   return make_dual_helper(std::tuple{args...}, std::make_integer_sequence<int, sizeof...(T)>{});
+}
+
+template < typename ... T >
+constexpr auto make_dual(std::tuple < T ... > args){
+  return make_dual_helper(args, std::make_integer_sequence<int, sizeof...(T)>{});
 }
