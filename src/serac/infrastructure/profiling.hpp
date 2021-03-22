@@ -51,6 +51,10 @@
  * Marks the end of a region Caliper profiling
  */
 
+/**
+ * @def SERAC_SET_METADATA(name, data)
+ * Sets metadata in caliper file. Calls serac::profiling::detail::setCaliperMetadata
+ */
 
 #ifdef SERAC_USE_CALIPER
 
@@ -60,6 +64,7 @@
 #define SERAC_MARK_LOOP_END(id) CALI_CXX_MARK_LOOP_END(id)
 #define SERAC_MARK_START(name) CALI_MARK_BEGIN(name)
 #define SERAC_MARK_END(name) CALI_MARK_END(name)
+#define SERAC_SET_METADATA(name, data) serac::profiling::detail::setCaliperMetadata(name, data)
 
 #else  // SERAC_USE_CALIPER not defined
 
@@ -70,10 +75,13 @@
 #define SERAC_MARK_LOOP_END(id)
 #define SERAC_MARK_START(name)
 #define SERAC_MARK_END(name)
+#define SERAC_SET_METADATA(name, data)
 
 #endif
 
+/// profiling namespace
 namespace serac::profiling {
+
 /**
  * @brief Initializes performance monitoring using the Caliper library
  * @param options The Caliper ConfigManager config string, optional
@@ -86,33 +94,30 @@ void initializeCaliper(const std::string& options = "");
  */
 void terminateCaliper();
 
-  /** 
-   * @brief Caliper metadata methods cali_set_global_(double|int|string|uint)_byname() 
+/// detail namespace
+namespace detail {
+/**
+ * @brief Caliper metadata methods cali_set_global_<double|int|string|uint>_byname()
+ *
+ * @param[in] name The tag to associate the following metadata with
+ * @param[in] data The metadata to store in the caliper file
+ */
+void setCaliperMetadata(const std::string& name, const std::string& data);
+
+/*!
+  @overload
 */
-  template<typename T> void setCaliperMetaData(const std::string& name, T data);
+void setCaliperMetadata(const std::string& name, int data);
 
-  /**
-   * @brief Adds double with given name to caliper metadata
-   */
-  template<> void setCaliperMetaData<double>(const std::string &name, double data);
+/*!
+  @overload
+*/
+void setCaliperMetadata(const std::string& name, double data);
 
-    /**
-   * @brief Adds int with given name to caliper metadata
-   */
+/*!
+  @overload
+*/
+void setCaliperMetadata(const std::string& name, unsigned int data);
+}  // namespace detail
 
-  template<> void setCaliperMetaData<int>(const std::string &name, int data);
-
-    /**
-   * @brief Adds string with given name to caliper metadata
-   */
-
-  template<> void setCaliperMetaData<const char *>(const std::string &name, const char * data);
-  
-    /**
-   * @brief Adds unsigned int with given name to caliper metadata
-   */
-
-  template<> void setCaliperMetaData<unsigned int>(const std::string &name, unsigned int data);
-  
-  
 }  // namespace serac::profiling
