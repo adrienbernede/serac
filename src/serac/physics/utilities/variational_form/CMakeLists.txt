@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: (BSD-3-Clause)
 
 set(weakform_depends serac_physics mfem mpi)
+blt_list_append( TO weakform_depends ELEMENTS caliper IF ${SERAC_USE_CALIPER} )
 
 # Add the library first
 set(weakform_headers
@@ -56,7 +57,8 @@ endforeach()
 # Then add the examples/tests
 set(weakform_tests_mpi
     tests/integration_rule_problem.cpp
-    tests/weak_form_comparisons.cpp)
+    tests/weak_form_comparisons.cpp
+    benchmark/bench_weak_form.cpp)
     
 foreach(filename ${weakform_tests_mpi})
     get_filename_component(test_name ${filename} NAME_WE)

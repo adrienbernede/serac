@@ -140,8 +140,11 @@ void chain_rule_tests(){
     std::tuple <
       double, tensor<double, 2>
     > dx;
-
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-variable"
     auto df = chain_rule<2>(df_dx, dx);
+#pragma clang diagnostic pop
+
 
     std::cout << std::get<0>(df) << std::endl;
     std::cout << std::get<1>(df) << std::endl;
