@@ -77,7 +77,8 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p> test, H1<p> trial, Dimension<dim
 
   ConstantCoefficient b_coef(b);
   A.AddDomainIntegrator(new DiffusionIntegrator(b_coef));
-  SERAC_PROFILE_REGION(concat("mfem_localAssemble", postfix)) {
+  {
+    SERAC_PROFILE_REGION(concat("mfem_localAssemble", postfix)); 
     A.Assemble(0);
   }
 
@@ -85,11 +86,12 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p> test, H1<p> trial, Dimension<dim
 
   mfem::Vector r1, r2;
   mfem::Vector g1, g2;
-    
-  SERAC_PROFILE_REGION(concat("mfem_parallelAssemble", postfix)) {
+
+
+  SERAC_PROFILE_REGION2(concat("mfem_parallelAssemble", postfix)) {
     std::unique_ptr<mfem::HypreParMatrix> J(A.ParallelAssemble());
 
-    SERAC_PROFILE_REGION(concat("mfem_ApplyGradient", postfix)) {
+    SERAC_PROFILE_REGION2(concat("mfem_ApplyGradient", postfix)) {
       g1 = (*J) * x;
     }    
   }
@@ -100,7 +102,8 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p> test, H1<p> trial, Dimension<dim
   });
 
   f.AddDomainIntegrator(new DomainLFIntegrator(load_func));
-  SERAC_PROFILE_REGION(concat("mfem_fAssemble", postfix)){
+  {
+    SERAC_PROFILE_REGION(concat("mfem_fAssemble", postfix));
     f.Assemble();
   }
 
@@ -122,21 +125,24 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p> test, H1<p> trial, Dimension<dim
   if constexpr (dim == 3) {
     residual.AddVolumeIntegral(constitutive_model, mesh);
   }
-
-  SERAC_PROFILE_REGION(concat("mfem_Apply", postfix)) {
+  
+  {
+    SERAC_PROFILE_REGION(concat("mfem_Apply", postfix));
     r1 = A * x - f;
   }
-
-  SERAC_PROFILE_REGION(concat("weakform_AssembleApply", postfix)) {
+  
+  {
+    SERAC_PROFILE_REGION(concat("weakform_AssembleApply", postfix));
     r2 = residual * x;
   }  
   
   EXPECT_NEAR(0., mfem::Vector(r1 - r2).Norml2() / r1.Norml2(), 1.e-14);
 
-  SERAC_PROFILE_REGION(concat("weakform_GetGradient", postfix)){
+  {
+    SERAC_PROFILE_REGION(concat("weakform_GetGradient", postfix));
     mfem::Operator & grad2 = residual.GetGradient(x);
-
-    SERAC_PROFILE_REGION(concat("weakform_ApplyGradient", postfix)){
+    {
+      SERAC_PROFILE_REGION(concat("weakform_ApplyGradient", postfix));
       g2 = grad2 * x;
     }
   }
@@ -163,9 +169,8 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p, dim> test, H1<p, dim> trial, Dim
   ConstantCoefficient lambda_coef(b);
   ConstantCoefficient mu_coef(b);
   A.AddDomainIntegrator(new ElasticityIntegrator(lambda_coef, mu_coef));
-  SERAC_PROFILE_REGION(concat("mfem_localAssemble", postfix)) {
-    A.Assemble(0);
-  }
+  SERAC_PROFILE_EXPR(concat("mfem_localAssemble", postfix),
+		     A.Assemble(0));
   A.Finalize();
 
   SERAC_MARK_START(concat("mfem_parallelAssemble", postfix));
@@ -180,8 +185,8 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p, dim> test, H1<p, dim> trial, Dim
 
   f.AddDomainIntegrator(new VectorDomainLFIntegrator(load_func));
 
-  SERAC_PROFILE_REGION(concat("mfem_fAssemble", postfix))
-    f.Assemble();
+  SERAC_PROFILE_EXPR(concat("mfem_fAssemble", postfix),
+		     f.Assemble());
 
   ParGridFunction x(&fespace);
   x.Randomize();
@@ -212,25 +217,27 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p, dim> test, H1<p, dim> trial, Dim
     residual.AddVolumeIntegral(constitutive_model, mesh);
   }
 
-  mfem::Vector r1, r2;
-  SERAC_PROFILE_REGION(concat("mfem_Apply", postfix))
-    r1 = A * x - f;
+  mfem::Vector r1 =
+    SERAC_PROFILE_EXPR(concat("mfem_Apply", postfix),
+		       A * x - f);
   
-  SERAC_PROFILE_REGION(concat("weakform_AssembleApply", postfix))
-    r2 = residual * x;
+  mfem::Vector r2 =  SERAC_PROFILE_EXPR(concat("weakform_AssembleApply", postfix),
+					residual * x);
 
   EXPECT_NEAR(0., mfem::Vector(r1 - r2).Norml2() / r1.Norml2(), 1.e-14);
 
-  mfem::Vector g1, g2;
-  SERAC_PROFILE_REGION(concat("mfem_ApplyGradient", postfix))
-    g1 = (*J) * x;
+
   
-  SERAC_PROFILE_REGION(concat("weakform_GetGradient", postfix)){
-    mfem::Operator & grad = residual.GetGradient(x);
-    SERAC_PROFILE_REGION(concat("weakform_ApplyGradient", postfix)) {
-      g2 = grad * x;
-    }
-  }
+  mfem::Vector g1 = SERAC_PROFILE_EXPR(concat("mfem_ApplyGradient", postfix),
+				       (*J) * x);
+  
+
+  mfem::Operator & grad = SERAC_PROFILE_EXPR(concat("weakform_GetGradient", postfix),
+					     residual.GetGradient(x));
+  
+  mfem::Vector g2 = SERAC_PROFILE_EXPR(concat("weakform_ApplyGradient", postfix),
+				       grad * x);
+
 
   EXPECT_NEAR(0., mfem::Vector(g1 - g2).Norml2() / g1.Norml2(), 1.e-14);  
 
@@ -255,14 +262,14 @@ void weak_form_test(mfem::ParMesh & mesh, Hcurl<p> test, Hcurl<p> trial, Dimensi
 
   ConstantCoefficient b_coef(b);
   A.AddDomainIntegrator(new CurlCurlIntegrator(b_coef));
-  SERAC_PROFILE_REGION(concat("mfem_localAssemble", postfix))
+  SERAC_PROFILE_REGION2(concat("mfem_localAssemble", postfix))
     A.Assemble(0);
   A.Finalize();
 
-  SERAC_MARK_START(concat("mfem_parallelAssemble", postfix));
-  std::unique_ptr<mfem::HypreParMatrix> J(A.ParallelAssemble());
-  SERAC_MARK_END(concat("mfem_parallelAssemble", postfix));
-
+  std::unique_ptr<mfem::HypreParMatrix> J(
+					  SERAC_PROFILE_EXPR(concat("mfem_parallelAssemble", postfix),
+							     A.ParallelAssemble()));
+  
   LinearForm f(&fespace);
   VectorFunctionCoefficient load_func(dim, [&](const Vector& coords, Vector& output) {
     double x = coords(0);
@@ -273,7 +280,7 @@ void weak_form_test(mfem::ParMesh & mesh, Hcurl<p> test, Hcurl<p> trial, Dimensi
   });
 
   f.AddDomainIntegrator(new VectorFEDomainLFIntegrator(load_func));
-  SERAC_PROFILE_REGION(concat("mfem_fAssemble", postfix))
+  SERAC_PROFILE_REGION2(concat("mfem_fAssemble", postfix))
     f.Assemble();
 
   ParGridFunction x(&fespace);
@@ -295,21 +302,21 @@ void weak_form_test(mfem::ParMesh & mesh, Hcurl<p> test, Hcurl<p> trial, Dimensi
   }, mesh);
 
   mfem::Vector r1, r2;
-  SERAC_PROFILE_REGION(concat("mfem_Apply", postfix))
+  SERAC_PROFILE_REGION2(concat("mfem_Apply", postfix))
     r1 = A * x - f;
-  SERAC_PROFILE_REGION(concat("weakform_AssembleApply", postfix))
+  SERAC_PROFILE_REGION2(concat("weakform_AssembleApply", postfix))
     r2 = residual * x;
 
   EXPECT_NEAR(0., mfem::Vector(r1 - r2).Norml2() / r1.Norml2(), 1.e-13);
 
-  mfem::Vector g1, g2;
-  SERAC_PROFILE_REGION(concat("mfem_ApplyGradient", postfix))
-    g1 = (*J) * x;
+  mfem::Vector g2;
+  mfem::Vector g1 = SERAC_PROFILE_EXPR(concat("mfem_ApplyGradient", postfix),
+				       (*J) * x);
   
-  SERAC_PROFILE_REGION(concat("weakform_GetGradient", postfix)){
+  SERAC_PROFILE_REGION2(concat("weakform_GetGradient", postfix)){
     mfem::Operator & grad = residual.GetGradient(x);
 
-    SERAC_PROFILE_REGION(concat("weakform_ApplyGradient", postfix)) {
+    SERAC_PROFILE_REGION2(concat("weakform_ApplyGradient", postfix)) {
       g2 = grad * x;
     }
   }
