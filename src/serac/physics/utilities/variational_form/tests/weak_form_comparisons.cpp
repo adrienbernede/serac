@@ -11,6 +11,8 @@
 #include "serac/physics/utilities/variational_form/weak_form.hpp"
 #include "serac/physics/utilities/variational_form/tensor.hpp"
 
+#include <gtest/gtest.h>
+
 using namespace std;
 using namespace mfem;
 
@@ -64,13 +66,14 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p> test, H1<p> trial, Dimension<dim
   A.Finalize();
   std::unique_ptr<mfem::HypreParMatrix> J(A.ParallelAssemble());
 
-  LinearForm f(&fespace);
+  ParLinearForm f(&fespace);
   FunctionCoefficient load_func([&](const Vector& coords) {
     return 100 * coords(0) * coords(1);
   });
 
   f.AddDomainIntegrator(new DomainLFIntegrator(load_func));
   f.Assemble();
+  std::unique_ptr<mfem::HypreParVector> F(f.ParallelAssemble());
 
   ParGridFunction x(&fespace);
   x.Randomize();
@@ -97,22 +100,23 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p> test, H1<p> trial, Dimension<dim
     residual.AddVolumeIntegral(constitutive_model, mesh);
   }
 
-  mfem::Vector r1 = A * x - f;
-  mfem::Vector r2 = residual * x;
+  mfem::Vector r1 = (*J) * X - (*F);
+  mfem::Vector r2 = residual * X;
 
   std::cout << "||r1||: " << r1.Norml2() << std::endl;
   std::cout << "||r2||: " << r2.Norml2() << std::endl;
   std::cout << "||r1-r2||/||r1||: " << mfem::Vector(r1 - r2).Norml2() / r1.Norml2() << std::endl;
+  EXPECT_NEAR(0., mfem::Vector(r1 - r2).Norml2() / r1.Norml2(), 1.e-14);
+  
+  mfem::Operator & grad2 = residual.GetGradient(X);
 
-  mfem::Operator & grad2 = residual.GetGradient(x);
-
-  mfem::Vector g1 = (*J) * x;
-  mfem::Vector g2 = grad2 * x;
+  mfem::Vector g1 = (*J) * X;
+  mfem::Vector g2 = grad2 * X;
 
   std::cout << "||g1||: " << g1.Norml2() << std::endl;
   std::cout << "||g2||: " << g2.Norml2() << std::endl;
   std::cout << "||g1-g2||/||g1||: " << mfem::Vector(g1 - g2).Norml2() / g1.Norml2() << std::endl;
-
+  EXPECT_NEAR(0., mfem::Vector(g1 - g2).Norml2() / g1.Norml2(), 1.e-14);  
 }
 
 template < int p, int dim >
@@ -137,7 +141,7 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p, dim> test, H1<p, dim> trial, Dim
 
   std::unique_ptr<mfem::HypreParMatrix> J(A.ParallelAssemble());
 
-  LinearForm f(&fespace);
+  ParLinearForm f(&fespace);
   VectorFunctionCoefficient load_func(dim, [&](const Vector& /*coords*/, Vector & force) {
     force = 0.0;
     force(0) = -1.0;
@@ -145,7 +149,8 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p, dim> test, H1<p, dim> trial, Dim
 
   f.AddDomainIntegrator(new VectorDomainLFIntegrator(load_func));
   f.Assemble();
-
+  std::unique_ptr<mfem::HypreParVector> F(f.ParallelAssemble());
+  
   ParGridFunction x(&fespace);
   x.Randomize();
 
@@ -175,17 +180,17 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p, dim> test, H1<p, dim> trial, Dim
     residual.AddVolumeIntegral(constitutive_model, mesh);
   }
 
-  mfem::Vector r1 = A * x - f;
-  mfem::Vector r2 = residual * x;
+  mfem::Vector r1 = (*J) * X - (*F);
+  mfem::Vector r2 = residual * X;
 
   std::cout << "||r1||: " << r1.Norml2() << std::endl;
   std::cout << "||r2||: " << r2.Norml2() << std::endl;
   std::cout << "||r1-r2||/||r1||: " << mfem::Vector(r1 - r2).Norml2() / r1.Norml2() << std::endl;
 
-  mfem::Operator & grad = residual.GetGradient(x);
+  mfem::Operator & grad = residual.GetGradient(X);
 
-  mfem::Vector g1 = (*J) * x;
-  mfem::Vector g2 = grad * x;
+  mfem::Vector g1 = (*J) * X;
+  mfem::Vector g2 = grad * X;
 
   std::cout << "||g1||: " << g1.Norml2() << std::endl;
   std::cout << "||g2||: " << g2.Norml2() << std::endl;
@@ -213,7 +218,7 @@ void weak_form_test(mfem::ParMesh & mesh, Hcurl<p> test, Hcurl<p> trial, Dimensi
   A.Finalize();
   std::unique_ptr<mfem::HypreParMatrix> J(A.ParallelAssemble());
 
-  LinearForm f(&fespace);
+  ParLinearForm f(&fespace);
   VectorFunctionCoefficient load_func(dim, [&](const Vector& coords, Vector& output) {
     double x = coords(0);
     double y = coords(1);
@@ -224,6 +229,7 @@ void weak_form_test(mfem::ParMesh & mesh, Hcurl<p> test, Hcurl<p> trial, Dimensi
 
   f.AddDomainIntegrator(new VectorFEDomainLFIntegrator(load_func));
   f.Assemble();
+  std::unique_ptr<mfem::HypreParVector> F(f.ParallelAssemble());
 
   ParGridFunction x(&fespace);
   x.Randomize();
@@ -243,17 +249,17 @@ void weak_form_test(mfem::ParMesh & mesh, Hcurl<p> test, Hcurl<p> trial, Dimensi
     return std::tuple{f0, f1};
   }, mesh);
 
-  mfem::Vector r1 = A * x - f;
-  mfem::Vector r2 = residual * x;
+  mfem::Vector r1 = (*J) * X - (*F);
+  mfem::Vector r2 = residual * X;
 
   std::cout << "||r1||: " << r1.Norml2() << std::endl;
   std::cout << "||r2||: " << r2.Norml2() << std::endl;
   std::cout << "||r1-r2||/||r1||: " << mfem::Vector(r1 - r2).Norml2() / r1.Norml2() << std::endl;
 
-  mfem::Operator & grad = residual.GetGradient(x);
+  mfem::Operator & grad = residual.GetGradient(X);
 
-  mfem::Vector g1 = (*J) * x;
-  mfem::Vector g2 = grad * x;
+  mfem::Vector g1 = (*J) * X;
+  mfem::Vector g2 = grad * X;
 
   std::cout << "||g1||: " << g1.Norml2() << std::endl;
   std::cout << "||g2||: " << g2.Norml2() << std::endl;
