@@ -186,7 +186,8 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p, dim> test, H1<p, dim> trial, Dim
   std::cout << "||r1||: " << r1.Norml2() << std::endl;
   std::cout << "||r2||: " << r2.Norml2() << std::endl;
   std::cout << "||r1-r2||/||r1||: " << mfem::Vector(r1 - r2).Norml2() / r1.Norml2() << std::endl;
-
+  EXPECT_NEAR(0., mfem::Vector(r1 - r2).Norml2() / r1.Norml2(), 1.e-14);
+  
   mfem::Operator & grad = residual.GetGradient(X);
 
   mfem::Vector g1 = (*J) * X;
@@ -195,7 +196,7 @@ void weak_form_test(mfem::ParMesh & mesh, H1<p, dim> test, H1<p, dim> trial, Dim
   std::cout << "||g1||: " << g1.Norml2() << std::endl;
   std::cout << "||g2||: " << g2.Norml2() << std::endl;
   std::cout << "||g1-g2||/||g1||: " << mfem::Vector(g1 - g2).Norml2() / g1.Norml2() << std::endl;
-
+  EXPECT_NEAR(0., mfem::Vector(g1 - g2).Norml2() / g1.Norml2(), 1.e-14);  
 }
 
 template < int p, int dim >
@@ -255,7 +256,8 @@ void weak_form_test(mfem::ParMesh & mesh, Hcurl<p> test, Hcurl<p> trial, Dimensi
   std::cout << "||r1||: " << r1.Norml2() << std::endl;
   std::cout << "||r2||: " << r2.Norml2() << std::endl;
   std::cout << "||r1-r2||/||r1||: " << mfem::Vector(r1 - r2).Norml2() / r1.Norml2() << std::endl;
-
+  EXPECT_NEAR(0., mfem::Vector(r1 - r2).Norml2() / r1.Norml2(), 1.e-13);
+  
   mfem::Operator & grad = residual.GetGradient(X);
 
   mfem::Vector g1 = (*J) * X;
@@ -264,7 +266,7 @@ void weak_form_test(mfem::ParMesh & mesh, Hcurl<p> test, Hcurl<p> trial, Dimensi
   std::cout << "||g1||: " << g1.Norml2() << std::endl;
   std::cout << "||g2||: " << g2.Norml2() << std::endl;
   std::cout << "||g1-g2||/||g1||: " << mfem::Vector(g1 - g2).Norml2() / g1.Norml2() << std::endl;
-
+  EXPECT_NEAR(0., mfem::Vector(g1 - g2).Norml2() / g1.Norml2(), 1.e-13);  
 }
 
 template < int dim >
