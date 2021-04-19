@@ -16,12 +16,18 @@ set(weakform_headers
     tuple_arithmetic.hpp
     polynomials.hpp
     quadrature.hpp
+    finite_element.hpp
+    detail/hexahedron_h1.inl
+    detail/hexahedron_hcurl.inl
+    detail/quadrilateral_h1.inl
+    detail/quadrilateral_hcurl.inl
+    detail/quadrilateral_L2.inl
+    detail/segment_h1.inl
     )
 
 blt_add_library(
       NAME        serac_weakform
       HEADERS     ${weakform_headers}
-      SOURCES     ${weakform_sources}
       DEPENDS_ON  ${weakform_depends}
       )
 
@@ -39,6 +45,9 @@ set(weakform_tests_serial
     tests/hcurl_unit_tests.cpp
     tests/test_tensor_ad.cpp
     tests/tuple_arithmetic_unit_tests.cpp
+    tests/J2_material_with_AD.cpp
+    tests/kernel_microbenchmark.cpp
+    tests/diffusion_performance_test.cpp
     tests/tensor_unit_tests.cpp)
     
 foreach(filename ${weakform_tests_serial})
@@ -56,7 +65,7 @@ endforeach()
 
 # Then add the examples/tests
 set(weakform_tests_mpi
-    tests/integration_rule_problem.cpp
+    tests/weak_form_boundary_test.cpp
     tests/weak_form_comparisons.cpp
     benchmark/bench_weak_form.cpp)
     
@@ -72,4 +81,3 @@ foreach(filename ${weakform_tests_mpi})
                  COMMAND       ${test_name}
                  NUM_MPI_TASKS 4)
 endforeach()
-    
