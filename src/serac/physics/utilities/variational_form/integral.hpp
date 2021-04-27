@@ -337,77 +337,78 @@ void gradient_kernel(const mfem::Vector& dU, mfem::Vector& dR, derivatives_type*
   }
 }
 
-// template < ::Geometry g, typename test, typename trial, int geometry_dim, int spatial_dim, int Q,
-//            typename derivatives_type>
-// void gradient_matrix_kernel(mfem::Vector & K_e, derivatives_type* derivatives_ptr, int num_elements)
-// { 
-//   using test_element               = finite_element<g, test>;
-//   if constexpr(test_element::family == Family::H1) {
+template < ::Geometry g, typename test, typename trial, int geometry_dim, int spatial_dim, int Q,
+           typename derivatives_type>
+void gradient_matrix_kernel(mfem::Vector & K_e, derivatives_type* derivatives_ptr, 
+			    const mfem::Vector& J_, int num_elements)
+{ 
+  using test_element               = finite_element<g, test>;
+  if constexpr(test_element::family == Family::H1) {
   
-//       using trial_element              = finite_element<g, trial>;
-//       //  using element_residual_type      = typename trial_element::residual_type;
-//       static constexpr int  test_ndof  = test_element::ndof;
-//       static constexpr int  trial_ndof = trial_element::ndof;
-//       static constexpr auto rule       = GaussQuadratureRule<g, Q>();
+      using trial_element              = finite_element<g, trial>;
+      //  using element_residual_type      = typename trial_element::residual_type;
+      static constexpr int  test_ndof  = test_element::ndof;
+      static constexpr int  trial_ndof = trial_element::ndof;
+      static constexpr auto rule       = GaussQuadratureRule<g, Q>();
 
-//       // mfem provides this information in 1D arrays, so we reshape it
-//       // into strided multidimensional arrays before using
-//       // auto J  = mfem::Reshape(J_.Read(), rule.size(), spatial_dim, geometry_dim, num_elements);
-//       // auto du = impl::Reshape<trial>(dU.Read(), trial_ndof, num_elements);
-//       auto dk = mfem::Reshape(K_e.ReadWrite(), test_ndof, trial_ndof, num_elements);
+      // mfem provides this information in 1D arrays, so we reshape it
+      // into strided multidimensional arrays before using
+      auto J  = mfem::Reshape(J_.Read(), rule.size(), spatial_dim, geometry_dim, num_elements);
+      //      auto du = impl::Reshape<trial>(dU.Read(), trial_ndof, num_elements);
+      [[maybe_unused]] auto dk = mfem::Reshape(K_e.ReadWrite(), test_ndof * spatial_dim, trial_ndof * spatial_dim, num_elements);
 
-//       // for each element in the domain
-//       for (int e = 0; e < num_elements; e++) {
-// 	// get the (change in) values for this particular element
-// 	// tensor du_elem = impl::Load<trial_element>(du, e);
+      // for each element in the domain
+      for (int e = 0; e < num_elements; e++) {
+	// get the (change in) values for this particular element
+	// tensor du_elem = impl::Load<trial_element>(du, e);
 
-// 	// this is where we will accumulate the (change in) element residual tensor
-// 	//    element_residual_type dr_elem{};
-// 	//    mfem::DenseMatrix K_elem(test_ndof, trial_ndof);
-// 	tensor<double, test_ndof, trial_ndof> K_elem{};
+	// this is where we will accumulate the (change in) element residual tensor
+	//    element_residual_type dr_elem{};
+	//    mfem::DenseMatrix K_elem(test_ndof, trial_ndof);
+	tensor<double, test_ndof * spatial_dim, trial_ndof * spatial_dim> K_elem{};
 
-// 	// for each quadrature point in the element
-// 	for (int q = 0; q < static_cast<int>(rule.size()); q++) {
-// 	  // get the position of this quadrature point in the parent and physical space,
-// 	  // and calculate the measure of that point in physical space.
-// 	  //	  auto   xi  = rule.points[q];
-// 	  auto   dxi = rule.weights[q];
-// 	  auto   J_q = make_tensor<spatial_dim, geometry_dim>([&](int i, int j) { return J(q, i, j, e); });
-// 	  double dx  = impl::Measure(J_q) * dxi;
+	// for each quadrature point in the element
+	for (int q = 0; q < static_cast<int>(rule.size()); q++) {
+	  // get the position of this quadrature point in the parent and physical space,
+	  // and calculate the measure of that point in physical space.
+	  //	  auto   xi  = rule.points[q];
+	  auto   dxi = rule.weights[q];
+	  [[maybe_unused]] auto   J_q = make_tensor<spatial_dim, geometry_dim>([&](int i, int j) { return J(q, i, j, e); });
+	  [[maybe_unused]] double dx  = impl::Measure(J_q) * dxi;
 
-// 	  // evaluate the (change in) value/derivatives at this quadrature point
-// 	  // auto darg = impl::Preprocess<trial_element>(du_elem, xi, J_q);
+	  // evaluate the (change in) value/derivatives at this quadrature point
+	  // auto darg = impl::Preprocess<trial_element>(du_elem, xi, J_q);
 
-// 	  // recall the derivative of the q-function w.r.t. its arguments at this quadrature point
-// 	  auto dq_darg = derivatives_ptr[e * int(rule.size()) + q];
+	  // recall the derivative of the q-function w.r.t. its arguments at this quadrature point
+	  auto dq_darg = derivatives_ptr[e * int(rule.size()) + q];
 
-// 	  // use the chain rule to compute the first-order change in the q-function output
-// 	  // auto dq = chain_rule(dq_darg, darg);
+	  // use the chain rule to compute the first-order change in the q-function output
+	  // auto dq = chain_rule(dq_darg, darg);
 
-// 	  // integrate dq against test space shape functions / gradients
-// 	  // to get the (change in) element residual contributions
-// 	  // dr_elem += impl::Postprocess<test_element>(dq, xi, J_q) * dx;
-// 	  auto K_temp = std::get<1>(dq_darg);
-// 	  auto K_temp2 = std::get<1>(K_temp);
-// 	  for (int i = 0; i < test_ndof; i++) {
-// 	    for (int j = 0; j < trial_ndof; j++) {
-// 	      double val = K_temp2[i][j];
-// 	      K_elem(0,0) += val;
-// 	    }
-// 	  }
-// 	}
+	  // integrate dq against test space shape functions / gradients
+	  // to get the (change in) element residual contributions
+	  // dr_elem += impl::Postprocess<test_element>(dq, xi, J_q) * dx;
+	  auto K_temp = std::get<1>(dq_darg);
+	  auto K_temp2 = std::get<1>(K_temp);
+	  for (int i = 0; i < test_ndof; i++) {
+	    for (int j = 0; j < trial_ndof; j++) {
+	      double val = K_temp2[i][j];
+	      K_elem(0,0) += val;
+	    }
+	  }
+	}
 
-// 	// once we've finished the element integration loop, write our element residuals
-// 	// out to memory, to be later assembled into global residuals by mfem
-// 	// for (int i = 0; i <test_ndof; i++) {
-// 	//   for (int j = 0; j < trial_ndof; j++) {
-// 	// 	dk(0,0,e) += K_elem(i,j) * dx;
-// 	//   }
-// 	// }
-// 	dk(0,0, e) += K_elem(0,0) * dx;
-//       }
-//     }
-// }
+	// once we've finished the element integration loop, write our element residuals
+	// out to memory, to be later assembled into global residuals by mfem
+	// for (int i = 0; i <test_ndof; i++) {
+	//   for (int j = 0; j < trial_ndof; j++) {
+	// 	dk(0,0,e) += K_elem(i,j) * dx;
+	//   }
+	// }
+	// dk(0,0, e) += K_elem(0,0) * dx;
+      }
+    }
+}
 
 
 namespace impl {
@@ -461,7 +462,7 @@ struct lambda_argument<Hcurl<p>, 3, 3> {
 static constexpr ::Geometry supported_geometries[] = {::Geometry::Point, ::Geometry::Segment, ::Geometry::Quadrilateral,
                                                       ::Geometry::Hexahedron};
 
-template <typename spaces>
+template <typename spaces, typename = void>
 struct Integral {
   using test_space  = test_space_t<spaces>;
   using trial_space = trial_space_t<spaces>;
@@ -505,11 +506,72 @@ struct Integral {
                                                                                        num_elements);
     };
 
-    // gradient_mat = [=](mfem::Vector & K_e) {
-    //   gradient_matrix_kernel<geometry, test_space, trial_space, geometry_dim, spatial_dim, Q>(K_e, qf_derivatives_ptr, num_elements);
-    // };
   }
 
+  void Mult(const mfem::Vector& input_E, mfem::Vector& output_E) const { evaluation(input_E, output_E); }
+
+  void GradientMult(const mfem::Vector& input_E, mfem::Vector& output_E) const { gradient(input_E, output_E); }
+
+  const mfem::Vector J_;
+  const mfem::Vector X_;
+
+  std::vector<char> qf_derivatives;
+
+  std::function<void(const mfem::Vector&, mfem::Vector&)> evaluation;
+  std::function<void(const mfem::Vector&, mfem::Vector&)> gradient;
+  std::function<void(mfem::Vector &)> gradient_mat;
+};
+
+
+template <typename spaces>
+struct Integral<spaces, std::enable_if<std::is_base_of_v<H1, test_space_t<spaces>> && std::is_base_of_v<H1, trial_space_t<spaces>>>> {
+  using test_space  = test_space_t<spaces>;
+  using trial_space = trial_space_t<spaces>;
+
+  template <int geometry_dim, int spatial_dim, typename lambda_type>
+  Integral(int num_elements, const mfem::Vector& J, const mfem::Vector& X, Dimension<geometry_dim>,
+           Dimension<spatial_dim>, lambda_type&& qf)
+      : J_(J), X_(X)
+  {
+    constexpr auto geometry = supported_geometries[geometry_dim];
+    constexpr auto Q        = std::max(test_space::order, trial_space::order) + 1;
+
+    // these lines of code figure out the argument types that will be passed
+    // into the quadrature function in the finite element kernel.
+    //
+    // we use them to observe the output type and allocate memory to store
+    // the derivative information at each quadrature point
+    using x_t             = tensor<double, spatial_dim>;
+    using u_du_t          = typename lambda_argument<trial_space, geometry_dim, spatial_dim>::type;
+    using derivative_type = decltype(get_gradient(qf(x_t{}, make_dual(u_du_t{}))));
+
+    auto num_quadrature_points = static_cast<uint32_t>(X.Size() / spatial_dim);
+    qf_derivatives.resize(sizeof(derivative_type) * num_quadrature_points);
+
+    auto qf_derivatives_ptr = reinterpret_cast<derivative_type*>(qf_derivatives.data());
+
+    // this is where we actually specialize the finite element kernel templates with
+    // our specific requirements (element type, test/trial spaces, quadrature rule, q-function, etc).
+    //
+    // std::function's type erasure lets us wrap those specific details inside a function with known signature
+    //
+    // note: the qf_derivatives_ptr is copied by value to each lambda function below,
+    //       to allow the evaluation kernel to pass derivative values to the gradient kernel
+    evaluation = [=](const mfem::Vector& U, mfem::Vector& R) {
+      evaluation_kernel<geometry, test_space, trial_space, geometry_dim, spatial_dim, Q>(U, R, qf_derivatives_ptr, J_,
+                                                                                         X_, num_elements, qf);
+    };
+
+    gradient = [=](const mfem::Vector& dU, mfem::Vector& dR) {
+      gradient_kernel<geometry, test_space, trial_space, geometry_dim, spatial_dim, Q>(dU, dR, qf_derivatives_ptr, J_,
+                                                                                       num_elements);
+    };
+
+    gradient_mat = [=](mfem::Vector & K_e) {
+      gradient_matrix_kernel<geometry, test_space, trial_space, geometry_dim, spatial_dim, Q>(K_e, qf_derivatives_ptr, num_elements);
+    };
+  }
+  
   void Mult(const mfem::Vector& input_E, mfem::Vector& output_E) const { evaluation(input_E, output_E); }
 
   void GradientMult(const mfem::Vector& input_E, mfem::Vector& output_E) const { gradient(input_E, output_E); }
