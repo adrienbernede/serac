@@ -377,7 +377,8 @@ void gradient_matrix_kernel(mfem::Vector & K_e, derivatives_type* derivatives_pt
 	  auto   xi_q  = rule.points[q];
 	  auto   dxi_q = rule.weights[q];
 	  [[maybe_unused]] auto   J_q = make_tensor<spatial_dim, geometry_dim>([&](int i, int j) { return J(q, i, j, e); });
-	  [[maybe_unused]] double dx  = impl::Measure(J_q) * dxi_q;
+	  auto detJ_q = impl::Measure(J_q);
+	  [[maybe_unused]] double dx  = detJ_q * dxi_q;
 
 	  // evaluate the (change in) value/derivatives at this quadrature point
 	  // auto darg = impl::Preprocess<trial_element>(du_elem, xi, J_q);
@@ -392,6 +393,17 @@ void gradient_matrix_kernel(mfem::Vector & K_e, derivatives_type* derivatives_pt
 	  [[maybe_unused]] auto dstress_dgradu = std::get<1>(std::get<1>(dq_darg));
 	  auto temp1 = dot(dstress_dgradu, transpose(dN_dx));
 	  K_elem += dot(dM_dx, temp1) * dx;
+
+	  // if (e == 0 ) {
+	  //   std::cout << "Element : " << e << " " << q << std::endl;
+	  //   std::cout << test_element::shape_function_gradients(xi_q) << std::endl;
+	  //   std::cout << dM_dx << std::endl;
+	  //   std::cout << dN_dx << std::endl;
+	  //   std::cout << dstress_dgradu << std::endl;
+	  //   std::cout << temp1 << std::endl;
+	  //   std::cout << K_elem << std::endl;
+	  //   std::cout << detJ_q << " " << dxi_q << std::endl;	    
+	  // }
 	}
 
 	// once we've finished the element integration loop, write our element residuals

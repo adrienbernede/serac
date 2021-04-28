@@ -67,7 +67,7 @@ struct WeakForm<test(trial), std::enable_if_t<!is_H1_v<test>>> : public mfem::Op
         P_test(test_space->GetProlongationMatrix()),
         G_test(test_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
         P_trial(trial_space->GetProlongationMatrix()),
-        G_trial(trial_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
+	G_trial(trial_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
         grad(*this)
   {
     MFEM_ASSERT(G_test, "Some GetElementRestriction error");
@@ -267,9 +267,9 @@ struct WeakForm<test(trial), std::enable_if_t<is_H1_v<test>>> : public mfem::Ope
         test_space(test_fes),
         trial_space(trial_fes),
         P_test(test_space->GetProlongationMatrix()),
-        G_test(test_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
+	G_test(test_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
         P_trial(trial_space->GetProlongationMatrix()),
-        G_trial(trial_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
+	G_trial(trial_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
         grad(*this)
   {
     MFEM_ASSERT(G_test, "Some GetElementRestriction error");
