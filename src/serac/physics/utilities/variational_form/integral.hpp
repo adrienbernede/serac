@@ -337,6 +337,7 @@ void gradient_kernel(const mfem::Vector& dU, mfem::Vector& dR, derivatives_type*
   }
 }
 
+
 template < ::Geometry g, typename test, typename trial, int geometry_dim, int spatial_dim, int Q,
            typename derivatives_type>
 void gradient_matrix_kernel(mfem::Vector & K_e, derivatives_type* derivatives_ptr, 
@@ -348,14 +349,16 @@ void gradient_matrix_kernel(mfem::Vector & K_e, derivatives_type* derivatives_pt
       using trial_element              = finite_element<g, trial>;
       //  using element_residual_type      = typename trial_element::residual_type;
       static constexpr int  test_ndof  = test_element::ndof;
+      static constexpr int  test_dim = test_element::components;
       static constexpr int  trial_ndof = trial_element::ndof;
+      static constexpr int  trial_dim = test_element::components;
       static constexpr auto rule       = GaussQuadratureRule<g, Q>();
 
       // mfem provides this information in 1D arrays, so we reshape it
       // into strided multidimensional arrays before using
       auto J  = mfem::Reshape(J_.Read(), rule.size(), spatial_dim, geometry_dim, num_elements);
       //      auto du = impl::Reshape<trial>(dU.Read(), trial_ndof, num_elements);
-      [[maybe_unused]] auto dk = mfem::Reshape(K_e.ReadWrite(), test_ndof * spatial_dim, trial_ndof * spatial_dim, num_elements);
+      [[maybe_unused]] auto dk = mfem::Reshape(K_e.ReadWrite(), test_ndof * test_dim, trial_ndof * trial_dim, num_elements);
 
       // for each element in the domain
       for (int e = 0; e < num_elements; e++) {
@@ -365,16 +368,16 @@ void gradient_matrix_kernel(mfem::Vector & K_e, derivatives_type* derivatives_pt
 	// this is where we will accumulate the (change in) element residual tensor
 	//    element_residual_type dr_elem{};
 	//    mfem::DenseMatrix K_elem(test_ndof, trial_ndof);
-	tensor<double, test_ndof * spatial_dim, trial_ndof * spatial_dim> K_elem{};
+	tensor<double, test_ndof * test_dim, trial_ndof * trial_dim> K_elem{};
 
 	// for each quadrature point in the element
 	for (int q = 0; q < static_cast<int>(rule.size()); q++) {
 	  // get the position of this quadrature point in the parent and physical space,
 	  // and calculate the measure of that point in physical space.
-	  //	  auto   xi  = rule.points[q];
-	  auto   dxi = rule.weights[q];
+	  auto   xi_q  = rule.points[q];
+	  auto   dxi_q = rule.weights[q];
 	  [[maybe_unused]] auto   J_q = make_tensor<spatial_dim, geometry_dim>([&](int i, int j) { return J(q, i, j, e); });
-	  [[maybe_unused]] double dx  = impl::Measure(J_q) * dxi;
+	  [[maybe_unused]] double dx  = impl::Measure(J_q) * dxi_q;
 
 	  // evaluate the (change in) value/derivatives at this quadrature point
 	  // auto darg = impl::Preprocess<trial_element>(du_elem, xi, J_q);
@@ -384,28 +387,20 @@ void gradient_matrix_kernel(mfem::Vector & K_e, derivatives_type* derivatives_pt
 
 	  // use the chain rule to compute the first-order change in the q-function output
 	  // auto dq = chain_rule(dq_darg, darg);
-
-	  // integrate dq against test space shape functions / gradients
-	  // to get the (change in) element residual contributions
-	  // dr_elem += impl::Postprocess<test_element>(dq, xi, J_q) * dx;
-	  auto K_temp = std::get<1>(dq_darg);
-	  auto K_temp2 = std::get<1>(K_temp);
-	  for (int i = 0; i < test_ndof; i++) {
-	    for (int j = 0; j < trial_ndof; j++) {
-	      double val = K_temp2[i][j];
-	      K_elem(0,0) += val;
-	    }
-	  }
+	  [[maybe_unused]] auto dM_dx = dot(test_element::shape_function_gradients(xi_q), inv(J_q));
+	  [[maybe_unused]] auto dN_dx = dot(trial_element::shape_function_gradients(xi_q), inv(J_q));
+	  [[maybe_unused]] auto dstress_dgradu = std::get<1>(std::get<1>(dq_darg));
+	  auto temp1 = dot(dstress_dgradu, transpose(dN_dx));
+	  K_elem += dot(dM_dx, temp1) * dx;
 	}
 
 	// once we've finished the element integration loop, write our element residuals
 	// out to memory, to be later assembled into global residuals by mfem
-	// for (int i = 0; i <test_ndof; i++) {
-	//   for (int j = 0; j < trial_ndof; j++) {
-	// 	dk(0,0,e) += K_elem(i,j) * dx;
-	//   }
-	// }
-	// dk(0,0, e) += K_elem(0,0) * dx;
+	for (int i = 0; i < test_ndof * test_dim; i++) {
+	  for (int j = 0; j < trial_ndof * trial_dim; j++) {
+	    dk(i, j, e) += K_elem[i][j];
+	  }
+	}
       }
     }
 }
@@ -461,6 +456,7 @@ struct lambda_argument<Hcurl<p>, 3, 3> {
 
 static constexpr ::Geometry supported_geometries[] = {::Geometry::Point, ::Geometry::Segment, ::Geometry::Quadrilateral,
                                                       ::Geometry::Hexahedron};
+
 
 template <typename spaces, typename = void>
 struct Integral {
@@ -522,9 +518,8 @@ struct Integral {
   std::function<void(mfem::Vector &)> gradient_mat;
 };
 
-
 template <typename spaces>
-struct Integral<spaces, std::enable_if<std::is_base_of_v<H1, test_space_t<spaces>> && std::is_base_of_v<H1, trial_space_t<spaces>>>> {
+struct Integral<spaces, std::enable_if_t<is_H1_v<test_space_t<spaces>>>> {
   using test_space  = test_space_t<spaces>;
   using trial_space = trial_space_t<spaces>;
 
@@ -568,7 +563,7 @@ struct Integral<spaces, std::enable_if<std::is_base_of_v<H1, test_space_t<spaces
     };
 
     gradient_mat = [=](mfem::Vector & K_e) {
-      gradient_matrix_kernel<geometry, test_space, trial_space, geometry_dim, spatial_dim, Q>(K_e, qf_derivatives_ptr, num_elements);
+      gradient_matrix_kernel<geometry, test_space, trial_space, geometry_dim, spatial_dim, Q>(K_e, qf_derivatives_ptr, J_, num_elements);
     };
   }
   
@@ -576,6 +571,10 @@ struct Integral<spaces, std::enable_if<std::is_base_of_v<H1, test_space_t<spaces
 
   void GradientMult(const mfem::Vector& input_E, mfem::Vector& output_E) const { gradient(input_E, output_E); }
 
+  void GradientMatrix(mfem::Vector & K_e) const {
+    gradient_mat(K_e);
+  }
+  
   const mfem::Vector J_;
   const mfem::Vector X_;
 
@@ -585,3 +584,4 @@ struct Integral<spaces, std::enable_if<std::is_base_of_v<H1, test_space_t<spaces
   std::function<void(const mfem::Vector&, mfem::Vector&)> gradient;
   std::function<void(mfem::Vector &)> gradient_mat;
 };
+

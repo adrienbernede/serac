@@ -68,9 +68,9 @@ endforeach()
 
 # Then add the examples/tests
 set(weakform_tests_mpi
-    tests/weak_form_boundary_test.cpp
-    tests/weak_form_comparisons.cpp
-    benchmark/bench_weak_form.cpp)
+#    tests/weak_form_boundary_test.cpp
+    tests/weak_form_comparisons.cpp)
+#    benchmark/bench_weak_form.cpp)
     
 foreach(filename ${weakform_tests_mpi})
     get_filename_component(test_name ${filename} NAME_WE)

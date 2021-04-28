@@ -41,6 +41,15 @@ struct H1 {
   static constexpr int components = c;
 };
 
+template <typename T>
+struct is_H1 : std::false_type{};
+
+template <int p, int c>
+struct is_H1 <H1<p,c>> : std::true_type{};
+
+template< typename T>
+inline constexpr bool is_H1_v = is_H1<T>::value;
+
 template <int p, int c = 1>
 struct Hcurl {
   static constexpr int order      = p;
