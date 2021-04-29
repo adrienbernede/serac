@@ -42,12 +42,14 @@ struct H1 {
 };
 
 template <typename T>
-struct is_H1 : std::false_type{};
+struct is_H1 : std::false_type {
+};
 
 template <int p, int c>
-struct is_H1 <H1<p,c>> : std::true_type{};
+struct is_H1<H1<p, c>> : std::true_type {
+};
 
-template< typename T>
+template <typename T>
 inline constexpr bool is_H1_v = is_H1<T>::value;
 
 template <int p, int c = 1>
@@ -78,7 +80,7 @@ enum class Evaluation
   Curl
 };
 
-template < ::Geometry g, typename family>
+template <::Geometry g, typename family>
 struct finite_element;
 
 template <typename T>
@@ -86,13 +88,13 @@ struct is_finite_element {
   static constexpr bool value = false;
 };
 
-template < ::Geometry g, int p, int c>
-struct is_finite_element<finite_element<g, H1<p, c> > > {
+template <::Geometry g, int p, int c>
+struct is_finite_element<finite_element<g, H1<p, c>>> {
   static constexpr bool value = true;
 };
 
-template < ::Geometry g, int p>
-struct is_finite_element<finite_element<g, Hcurl<p> > > {
+template <::Geometry g, int p>
+struct is_finite_element<finite_element<g, Hcurl<p>>> {
   static constexpr bool value = true;
 };
 
@@ -107,7 +109,7 @@ struct is_quadrature_data {
 };
 
 template <typename T>
-struct is_quadrature_data<quadrature_data<T> > {
+struct is_quadrature_data<quadrature_data<T>> {
   static constexpr bool value = true;
 };
 

@@ -66,26 +66,26 @@
 #define SERAC_MARK_END(name) serac::profiling::detail::endCaliperRegion(name)
 #define SERAC_SET_METADATA(name, data) serac::profiling::detail::setCaliperMetadata(name, data)
 
-#define SERAC_CONCAT_(a,b) a##b
-#define SERAC_CONCAT(a,b) SERAC_CONCAT_(a,b)
-#define SERAC_PROFILE_REGION2(name) \
- if (1) {\
-     SERAC_MARK_START(name); \
-     goto SERAC_CONCAT(generated, __LINE__); \
- } else \
-     while(1) \
-         if (1) {\
-             SERAC_MARK_END(name); \
-             break; \
-         } else \
-             SERAC_CONCAT(generated, __LINE__):
+#define SERAC_CONCAT_(a, b) a##b
+#define SERAC_CONCAT(a, b) SERAC_CONCAT_(a, b)
+#define SERAC_PROFILE_REGION2(name)         \
+  if (1) {                                  \
+    SERAC_MARK_START(name);                 \
+    goto SERAC_CONCAT(generated, __LINE__); \
+  } else                                    \
+    while (1)                               \
+      if (1) {                              \
+        SERAC_MARK_END(name);               \
+        break;                              \
+      } else                                \
+        SERAC_CONCAT(generated, __LINE__) :
 
 #define SERAC_PROFILE_REGION(name) serac::profiling::detail::Region SERAC_CONCAT(region, __LINE__)(name)
 
-#define SERAC_PROFILE_EXPR(name, expr) \
-  [&]()-> typename serac::profiling::detail::expr_t<decltype(expr)>::expr_type { \
-    const serac::profiling::detail::Region SERAC_CONCAT(region, __LINE__)(name); \
-    return expr; \
+#define SERAC_PROFILE_EXPR(name, expr)                                            \
+  [&]() -> typename serac::profiling::detail::expr_t<decltype(expr)>::expr_type { \
+    const serac::profiling::detail::Region SERAC_CONCAT(region, __LINE__)(name);  \
+    return expr;                                                                  \
   }()
 
 #else  // SERAC_USE_CALIPER not defined
@@ -106,93 +106,92 @@
 
 /// profiling namespace
 namespace serac::profiling {
-  
+
+/**
+ * @brief Initializes performance monitoring using the Caliper library
+ * @param options The Caliper ConfigManager config string, optional
+ * @see https://software.llnl.gov/Caliper/ConfigManagerAPI.html#configmanager-configuration-string-syntax
+ */
+void initializeCaliper(const std::string& options = "");
+
+/**
+ * @brief Concludes performance monitoring and writes collected data to a file
+ */
+void terminateCaliper();
+
+/// detail namespace
+namespace detail {
+/**
+ * @brief Caliper metadata methods cali_set_global_<double|int|string|uint>_byname()
+ *
+ * @param[in] name The tag to associate the following metadata with
+ * @param[in] data The metadata to store in the caliper file
+ */
+void setCaliperMetadata(const std::string& name, const std::string& data);
+
+/*!
+  @overload
+*/
+void setCaliperMetadata(const std::string& name, int data);
+
+/*!
+  @overload
+*/
+void setCaliperMetadata(const std::string& name, double data);
+
+/*!
+  @overload
+*/
+void setCaliperMetadata(const std::string& name, unsigned int data);
+
+/**
+ * @brief Caliper method for marking the start of a profiling region
+ *
+ * @param[in] name The tag to associate with the region.
+ */
+void startCaliperRegion(const char* name);
+
+/*!
+  @overload
+*/
+void startCaliperRegion(const std::string& name);
+
+/**
+ * @brief Caliper methods for marking the end of a region
+ *
+ * @param[in] name The tag to associate with the region.
+ */
+void endCaliperRegion(const char* name);
+
+/*!
+  @overload
+*/
+void endCaliperRegion(const std::string& name);
+
+// Profile a region of code
+class Region {
+public:
   /**
-   * @brief Initializes performance monitoring using the Caliper library
-   * @param options The Caliper ConfigManager config string, optional
-   * @see https://software.llnl.gov/Caliper/ConfigManagerAPI.html#configmanager-configuration-string-syntax
+   * @brief Profile a region of code using a specific tag name with caliper
+   *
+   * When the object is instantiated it calls SERAC_MARK_START(name)
+   * When this region goes out of scope, it will call SERAC_MARK_END(name)
+   *
+   * @param[in] name tag name for this region
    */
-  void initializeCaliper(const std::string& options = "");
+  Region(const std::string& name) : name_(name) { SERAC_MARK_START(name_); }
 
-  /**
-   * @brief Concludes performance monitoring and writes collected data to a file
-   */
-  void terminateCaliper();
+  ~Region() { SERAC_MARK_END(name_); }
 
-  /// detail namespace
-  namespace detail {
-    /**
-     * @brief Caliper metadata methods cali_set_global_<double|int|string|uint>_byname()
-     *
-     * @param[in] name The tag to associate the following metadata with
-     * @param[in] data The metadata to store in the caliper file
-     */
-    void setCaliperMetadata(const std::string& name, const std::string& data);
+protected:
+  std::string name_;
+};
 
-    /*!
-      @overload
-    */
-    void setCaliperMetadata(const std::string& name, int data);
+template <typename T>
+struct expr_t {
+  using expr_type = T;
+};
 
-    /*!
-      @overload
-    */
-    void setCaliperMetadata(const std::string& name, double data);
+}  // namespace detail
 
-    /*!
-      @overload
-    */
-    void setCaliperMetadata(const std::string& name, unsigned int data);
-
-    /**
-     * @brief Caliper method for marking the start of a profiling region
-     *
-     * @param[in] name The tag to associate with the region.
-     */
-    void startCaliperRegion(const char * name);
-
-    /*!
-      @overload
-    */
-    void startCaliperRegion(const std::string & name);
-  
-    /**
-     * @brief Caliper methods for marking the end of a region 
-     *
-     * @param[in] name The tag to associate with the region.
-     */
-    void endCaliperRegion(const char * name);
-
-    /*!
-      @overload
-    */
-    void endCaliperRegion(const std::string & name);    
-
-    // Profile a region of code
-    class Region {
-    public:
-      /**
-       * @brief Profile a region of code using a specific tag name with caliper
-       *
-       * When the object is instantiated it calls SERAC_MARK_START(name)
-       * When this region goes out of scope, it will call SERAC_MARK_END(name) 
-       *
-       * @param[in] name tag name for this region
-       */
-      Region(const std::string &name) : name_(name)
-      { SERAC_MARK_START(name_); }
-
-      ~Region() { SERAC_MARK_END(name_); }
-    protected:
-      std::string name_;
-    };
-
-    template<typename T>
-    struct expr_t {
-      using expr_type = T;
-    };
-    
-  }  // namespace detail
-
-  
 }  // namespace serac::profiling

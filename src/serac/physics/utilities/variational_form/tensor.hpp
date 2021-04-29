@@ -205,11 +205,12 @@ constexpr auto operator*(T /*other*/, zero)
 }
 
 namespace std {
-  template <std::size_t i>
-  constexpr zero get(zero &) {
-    return zero{};
-  }
+template <std::size_t i>
+constexpr zero get(zero&)
+{
+  return zero{};
 }
+}  // namespace std
 
 // reduced_tensor removes 1s from tensor dimensions
 template <typename T, int n1, int n2 = 1>
@@ -1073,6 +1074,36 @@ auto chain_rule(tensor<double, m, n, p...> df_dx, tensor<double, p...> dx)
   }
   return total;
 }
+
+// tensor conversions
+template <int m, int n, typename T>
+auto convert(tensor<T, m, n> A)
+{
+  return A;
+}
+
+template <int m, int n, typename T>
+auto convert(T value)
+{
+  tensor<T, m, n> A;
+  A[0][0] = value;
+  return A;
+}
+
+template <int m, int n, int o, typename T>
+auto convert(tensor<T, m, n, o> A)
+{
+  return A;
+}
+
+template <int m, int n, int o, typename T>
+auto convert(T value)
+{
+  tensor<T, m, n, o> A;
+  A[0][0][0] = value;
+  return A;
+}
+
 
 /*
 tuple<double, double, double> output = chain_rule(

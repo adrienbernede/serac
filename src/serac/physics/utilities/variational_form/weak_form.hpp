@@ -9,7 +9,7 @@
 #include "serac/physics/utilities/variational_form/tuple_arithmetic.hpp"
 #include "serac/physics/utilities/variational_form/integral.hpp"
 
-template <typename T , typename = void>
+template <typename T, typename = void>
 struct WeakForm;
 
 // WeakForm is intended to be like std::function for finite element kernels
@@ -67,7 +67,7 @@ struct WeakForm<test(trial), std::enable_if_t<!is_H1_v<test>>> : public mfem::Op
         P_test(test_space->GetProlongationMatrix()),
         G_test(test_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
         P_trial(trial_space->GetProlongationMatrix()),
-	G_trial(trial_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
+        G_trial(trial_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
         grad(*this)
   {
     MFEM_ASSERT(G_test, "Some GetElementRestriction error");
@@ -232,8 +232,8 @@ struct WeakForm<test(trial), std::enable_if_t<!is_H1_v<test>>> : public mfem::Op
   const mfem::Operator *P_test, *G_test;
   const mfem::Operator *P_trial, *G_trial;
 
-  std::vector<Integral<test(trial)> > domain_integrals;
-  std::vector<Integral<test(trial)> > boundary_integrals;
+  std::vector<Integral<test(trial)>> domain_integrals;
+  std::vector<Integral<test(trial)>> boundary_integrals;
 
   // simplex elements are currently not supported;
   static constexpr mfem::Element::Type supported_types[4] = {mfem::Element::POINT, mfem::Element::SEGMENT,
@@ -241,7 +241,6 @@ struct WeakForm<test(trial), std::enable_if_t<!is_H1_v<test>>> : public mfem::Op
 
   mutable Gradient grad;
 };
-
 
 // A specialized copy of above just to start implementation
 template <typename test, typename trial>
@@ -267,9 +266,9 @@ struct WeakForm<test(trial), std::enable_if_t<is_H1_v<test>>> : public mfem::Ope
         test_space(test_fes),
         trial_space(trial_fes),
         P_test(test_space->GetProlongationMatrix()),
-	G_test(test_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
+        G_test(test_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
         P_trial(trial_space->GetProlongationMatrix()),
-	G_trial(trial_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
+        G_trial(trial_space->GetElementRestriction(mfem::ElementDofOrdering::LEXICOGRAPHIC)),
         grad(*this)
   {
     MFEM_ASSERT(G_test, "Some GetElementRestriction error");
@@ -413,12 +412,8 @@ struct WeakForm<test(trial), std::enable_if_t<is_H1_v<test>>> : public mfem::Ope
     Evaluation<Operation::GradientMult>(input_T, output_T);
   }
 
-  virtual void GradientMatrix(mfem::Vector& K_e) const
-  {
-    domain_integrals[0].GradientMatrix(K_e);
-  }
+  virtual void GradientMatrix(mfem::Vector& K_e) const { domain_integrals[0].GradientMatrix(K_e); }
 
-  
   virtual mfem::Operator& GetGradient(const mfem::Vector& x) const
   {
     Mult(x, dummy);  // this is ugly
@@ -440,8 +435,8 @@ struct WeakForm<test(trial), std::enable_if_t<is_H1_v<test>>> : public mfem::Ope
   const mfem::Operator *P_test, *G_test;
   const mfem::Operator *P_trial, *G_trial;
 
-  std::vector<Integral<test(trial)> > domain_integrals;
-  std::vector<Integral<test(trial)> > boundary_integrals;
+  std::vector<Integral<test(trial)>> domain_integrals;
+  std::vector<Integral<test(trial)>> boundary_integrals;
 
   // simplex elements are currently not supported;
   static constexpr mfem::Element::Type supported_types[4] = {mfem::Element::POINT, mfem::Element::SEGMENT,

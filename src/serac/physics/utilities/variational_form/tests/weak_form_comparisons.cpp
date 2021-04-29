@@ -20,7 +20,7 @@ using namespace mfem;
 using namespace serac;
 
 double tol = 1.e-13;
-int num_procs, myid;
+int    num_procs, myid;
 
 constexpr bool                 verbose = false;
 std::unique_ptr<mfem::ParMesh> mesh2D;
@@ -253,81 +253,68 @@ void weak_form_test(mfem::ParMesh& mesh, Hcurl<p> test, Hcurl<p> trial, Dimensio
   EXPECT_NEAR(0., mfem::Vector(g1 - g2).Norml2() / g1.Norml2(), tol);
 }
 
-const mfem::IntegrationRule &DiffusionIntegrator_GetRule(
-   const mfem::FiniteElement &trial_fe, const mfem::FiniteElement &test_fe)
+const mfem::IntegrationRule& DiffusionIntegrator_GetRule(const mfem::FiniteElement& trial_fe,
+                                                         const mfem::FiniteElement& test_fe)
 {
-   int order;
-   if (trial_fe.Space() == mfem::FunctionSpace::Pk)
-   {
-      order = trial_fe.GetOrder() + test_fe.GetOrder() - 2;
-   }
-   else
-   {
-      // order = 2*el.GetOrder() - 2;  // <-- this seems to work fine too
-      order = trial_fe.GetOrder() + test_fe.GetOrder() + trial_fe.GetDim() - 1;
-   }
+  int order;
+  if (trial_fe.Space() == mfem::FunctionSpace::Pk) {
+    order = trial_fe.GetOrder() + test_fe.GetOrder() - 2;
+  } else {
+    // order = 2*el.GetOrder() - 2;  // <-- this seems to work fine too
+    order = trial_fe.GetOrder() + test_fe.GetOrder() + trial_fe.GetDim() - 1;
+  }
 
-   if (trial_fe.Space() == mfem::FunctionSpace::rQk)
-   {
-      return RefinedIntRules.Get(trial_fe.GetGeomType(), order);
-   }
-   return mfem::IntRules.Get(trial_fe.GetGeomType(), order);
+  if (trial_fe.Space() == mfem::FunctionSpace::rQk) {
+    return RefinedIntRules.Get(trial_fe.GetGeomType(), order);
+  }
+  return mfem::IntRules.Get(trial_fe.GetGeomType(), order);
 }
 
 // Copy of DiffusionIntegrator
-void DiffusionIntegrator_AssembleElementMatrix
-( mfem::Coefficient & Q, const mfem::FiniteElement &el, mfem::ElementTransformation &Trans,
-  mfem::DenseMatrix &elmat )
+void DiffusionIntegrator_AssembleElementMatrix(mfem::Coefficient& Q, const mfem::FiniteElement& el,
+                                               mfem::ElementTransformation& Trans, mfem::DenseMatrix& elmat)
 {
-  int nd = el.GetDof();
-  int dim = el.GetDim();
-  int spaceDim = Trans.GetSpaceDim();
-  bool square = (dim == spaceDim);
+  int    nd       = el.GetDof();
+  int    dim      = el.GetDim();
+  int    spaceDim = Trans.GetSpaceDim();
+  bool   square   = (dim == spaceDim);
   double w;
 
-
-  mfem::DenseMatrix dshape(nd,dim), dshapedxt(nd,spaceDim), invdfdx(dim,spaceDim);
-  mfem::Vector D(0);
+  mfem::DenseMatrix dshape(nd, dim), dshapedxt(nd, spaceDim), invdfdx(dim, spaceDim);
+  mfem::Vector      D(0);
   elmat.SetSize(nd);
 
-  const mfem::IntegrationRule *ir = &DiffusionIntegrator_GetRule(el, el);
+  const mfem::IntegrationRule* ir = &DiffusionIntegrator_GetRule(el, el);
 
   elmat = 0.0;
-  for (int i = 0; i < ir->GetNPoints(); i++)
-    {
-      const mfem::IntegrationPoint &ip = ir->IntPoint(i);
-      el.CalcDShape(ip, dshape);
+  for (int i = 0; i < ir->GetNPoints(); i++) {
+    const mfem::IntegrationPoint& ip = ir->IntPoint(i);
+    el.CalcDShape(ip, dshape);
 
-      Trans.SetIntPoint(&ip);
-      w = Trans.Weight();
-      w = ip.weight / (square ? w : w*w*w);
-      // AdjugateJacobian = / adj(J),         if J is square
-      //                    \ adj(J^t.J).J^t, otherwise
-      Mult(dshape, Trans.AdjugateJacobian(), dshapedxt);
+    Trans.SetIntPoint(&ip);
+    w = Trans.Weight();
+    w = ip.weight / (square ? w : w * w * w);
+    // AdjugateJacobian = / adj(J),         if J is square
+    //                    \ adj(J^t.J).J^t, otherwise
+    Mult(dshape, Trans.AdjugateJacobian(), dshapedxt);
 
-      double q = Q.Eval(Trans, ip);
-	
-      w *= q;
-      
-      AddMult_a_AAt(w, dshapedxt, elmat);
-    }
+    double q = Q.Eval(Trans, ip);
+
+    w *= q;
+
+    AddMult_a_AAt(w, dshapedxt, elmat);
+  }
 }
 
-
 /* Start of dark arts to get at Bilinearform.mat*/
-template < typename From, auto V, typename Result> 
-struct forbidden
-{
-  friend Result _get_mat(From& from)
-  {
-    return from.*V;
-  }
-
+template <typename From, auto V, typename Result>
+struct forbidden {
+  friend Result _get_mat(From& from) { return from.*V; }
 };
 
 mfem::SparseMatrix* _get_mat(mfem::ParBilinearForm&);
 
-template struct forbidden<mfem::ParBilinearForm, &mfem::ParBilinearForm::mat, mfem::SparseMatrix *>;
+template struct forbidden<mfem::ParBilinearForm, &mfem::ParBilinearForm::mat, mfem::SparseMatrix*>;
 
 /* End of dark arts */
 
@@ -346,17 +333,17 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
   A.AddDomainIntegrator(new MassIntegrator(a_coef));
 
   ConstantCoefficient b_coef(b);
-  auto diff_integ = new DiffusionIntegrator(b_coef);
+  auto                diff_integ = new DiffusionIntegrator(b_coef);
 
-  //modify integration rule temporarily to match weak_form?
+  // modify integration rule temporarily to match weak_form?
   A.AddDomainIntegrator(diff_integ);
   constexpr int skip_zeros = 0;
   A.Assemble(skip_zeros);
   A.Finalize();
 
   // Save a deep-copy of rank local assembled sparse matrix
-  mfem::SparseMatrix A_spmat_mfem (*_get_mat(A));
-  
+  mfem::SparseMatrix A_spmat_mfem(*_get_mat(A));
+
   std::unique_ptr<mfem::HypreParMatrix> J(A.ParallelAssemble());
 
   ParLinearForm       f(&fespace);
@@ -409,46 +396,49 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
   }
   EXPECT_NEAR(0., mfem::Vector(g1 - g2).Norml2() / g1.Norml2(), tol);
 
-  Array< int > dofs;
-  fespace.GetElementDofs (0, dofs);
-  mfem::Vector K_e(mesh.GetNE() * dofs.Size() * fespace.GetVDim() * dofs.Size() * fespace.GetVDim() );
+  Array<int> dofs;
+  fespace.GetElementDofs(0, dofs);
+  mfem::Vector K_e(mesh.GetNE() * dofs.Size() * fespace.GetVDim() * dofs.Size() * fespace.GetVDim());
   K_e = 0.;
   residual.GradientMatrix(K_e);
-  std::cout << "K_e: (" << K_e.Size() << ")" << std::endl << std::endl;;
+  std::cout << "K_e: (" << K_e.Size() << ")" << std::endl << std::endl;
+  ;
 
   // Reprocess each element from LEXICOGRAPHIC -> NATIVE for the tensorbasiscase
-  auto inv_dof_map = dynamic_cast<const mfem::TensorBasisElement *>(fespace.GetFE(0))->GetDofMap(); // for quads the change from NATIVE -> lexicographic is the same
+  auto inv_dof_map = dynamic_cast<const mfem::TensorBasisElement*>(fespace.GetFE(0))
+                         ->GetDofMap();  // for quads the change from NATIVE -> lexicographic is the same
 
-  mfem::SparseMatrix A_spmat_weak (A_spmat_mfem.Height());
-  constexpr auto ordering_type = mfem::Ordering::byNODES;
+  mfem::SparseMatrix A_spmat_weak(A_spmat_mfem.Height());
+  constexpr auto     ordering_type = mfem::Ordering::byNODES;
   {
-    auto dk = mfem::Reshape(K_e.ReadWrite(), dofs.Size() * fespace.GetVDim(), dofs.Size() * fespace.GetVDim(), mesh.GetNE());
+    auto dk =
+        mfem::Reshape(K_e.ReadWrite(), dofs.Size() * fespace.GetVDim(), dofs.Size() * fespace.GetVDim(), mesh.GetNE());
     for (int e = 0; e < mesh.GetNE(); e++) {
       DenseMatrix mat(dofs.Size() * fespace.GetVDim());
       for (int i = 0; i < dofs.Size(); i++) {
-	for (int id = 0; id < fespace.GetVDim(); id++) {
-	  for (int j = 0; j < dofs.Size(); j++) {
-	    for (int jd = 0; jd < fespace.GetVDim(); jd++) {
-	      int inv_i_vdof = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), inv_dof_map[i], id);
-	      int inv_j_vdof = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), inv_dof_map[j], jd);
-	      int i_vdof = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), i, id);
-	      int j_vdof = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), j, id);
-	      mat(inv_i_vdof, inv_j_vdof) = dk(i_vdof, j_vdof, e);
-	    }
-	  }
-	}
+        for (int id = 0; id < fespace.GetVDim(); id++) {
+          for (int j = 0; j < dofs.Size(); j++) {
+            for (int jd = 0; jd < fespace.GetVDim(); jd++) {
+              int inv_i_vdof = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), inv_dof_map[i], id);
+              int inv_j_vdof = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), inv_dof_map[j], jd);
+              int i_vdof     = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), i, id);
+              int j_vdof     = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), j, id);
+              mat(inv_i_vdof, inv_j_vdof) = dk(i_vdof, j_vdof, e);
+            }
+          }
+        }
       }
       // Copy back
       for (int i = 0; i < dofs.Size(); i++) {
-	for (int id = 0; id < fespace.GetVDim(); id++) {
-	  for (int j = 0; j < dofs.Size(); j++) {
-	    for (int jd = 0; jd < fespace.GetVDim(); jd++) {
-	      int i_vdof = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), i, id);
-	      int j_vdof = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), j, id);
-	      dk(i_vdof, j_vdof, e) = mat(i_vdof, j_vdof);
-	    }
-	  }
-	}
+        for (int id = 0; id < fespace.GetVDim(); id++) {
+          for (int j = 0; j < dofs.Size(); j++) {
+            for (int jd = 0; jd < fespace.GetVDim(); jd++) {
+              int i_vdof            = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), i, id);
+              int j_vdof            = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), j, id);
+              dk(i_vdof, j_vdof, e) = mat(i_vdof, j_vdof);
+            }
+          }
+        }
       }
 
       Array<int> elem_vdofs;
@@ -469,9 +459,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
       EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_spmat_weak(r, columns[c]), 1.e-10);
     }
   }
-  
 }
-
 
 TEST(thermal, 2D_linear) { weak_form_test(*mesh2D, H1<1>{}, H1<1>{}, Dimension<2>{}); }
 TEST(thermal, 2D_quadratic) { weak_form_test(*mesh2D, H1<2>{}, H1<2>{}, Dimension<2>{}); }
