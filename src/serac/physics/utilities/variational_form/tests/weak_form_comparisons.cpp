@@ -343,15 +343,12 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
   ParBilinearForm A(&fespace);
 
   ConstantCoefficient a_coef(a);
-  //  A.AddDomainIntegrator(new MassIntegrator(a_coef));
+  A.AddDomainIntegrator(new MassIntegrator(a_coef));
 
   ConstantCoefficient b_coef(b);
   auto diff_integ = new DiffusionIntegrator(b_coef);
 
   //modify integration rule temporarily to match weak_form?
-  auto trial_fe = fespace.GetFE(0);
-  int order = 2;
-  diff_integ->SetIntRule(&mfem::IntRules.Get(trial_fe->GetGeomType(), order));
   A.AddDomainIntegrator(diff_integ);
   constexpr int skip_zeros = 0;
   A.Assemble(skip_zeros);
@@ -384,7 +381,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
       Dimension<dim>{},
       [&]([[maybe_unused]] auto x, auto temperature) {
         auto [u, du_dx] = temperature;
-        auto f0         =  - (100 * x[0] * x[1]); //+ a * u;
+        auto f0         = a * u - (100 * x[0] * x[1]);
         auto f1         = b * du_dx;
         return std::tuple{f0, f1};
       },
@@ -460,45 +457,6 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
     }
   }
   A_spmat_weak.Finalize();
-
-  
-  // Grab all the elements from mfem Bilinearform
-  mfem::SparseMatrix A_spmat_mfem2 (A_spmat_mfem.Height());
-  mfem::Vector K_e_mfem(mesh.GetNE() * dofs.Size() * fespace.GetVDim() * dofs.Size() * fespace.GetVDim() );
-  K_e_mfem = 0.;
-  {
-    auto dk = mfem::Reshape(K_e_mfem.ReadWrite(), dofs.Size() * fespace.GetVDim(), dofs.Size() * fespace.GetVDim(), mesh.GetNE());
-    for (int e = 0; e < mesh.GetNE(); e++) {
-      DenseMatrix mat;
-      DiffusionIntegrator_AssembleElementMatrix(b_coef, *(fespace.GetFE(e)), *(fespace.GetElementTransformation(e)), mat);
-      for (int i = 0; i < mat.Height(); i++) {
-	for (int j = 0; j < mat.Width(); j++) {
-	  dk(i,j,e) = mat(i,j);
-	}
-      }
-
-
-      DenseMatrix mat2;
-      diff_integ->AssembleElementMatrix(*(fespace.GetFE(e)), *(fespace.GetElementTransformation(e)), mat2);
-      for (int i = 0; i < mat.Height(); i++) {
-	for (int j = 0; j < mat.Width(); j++) {
-	  EXPECT_NEAR(mat(i,j), mat2(i,j), 1.e-10);
-	}
-      }
-
-      Array<int> elem_vdofs;
-      fespace.GetElementVDofs(e, elem_vdofs);
-      A_spmat_mfem2.AddSubMatrix(elem_vdofs, elem_vdofs, mat, skip_zeros);      
-
-    }
-  }
-  A_spmat_mfem2.Finalize();
-
-  // check all the element contributions
-  for (int i = 0; i < K_e.Size(); i++) {
-    EXPECT_NEAR(K_e_mfem[i], K_e[i], 1.e-10);
-  }
-
 
   // check assembled matrices
   // for (int i = 0; i < A_spmat_weak.NumNonZeroElems(); i++) {

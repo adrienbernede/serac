@@ -204,6 +204,13 @@ constexpr auto operator*(T /*other*/, zero)
   return zero{};
 }
 
+namespace std {
+  template <std::size_t i>
+  constexpr zero get(zero &) {
+    return zero{};
+  }
+}
+
 // reduced_tensor removes 1s from tensor dimensions
 template <typename T, int n1, int n2 = 1>
 using reduced_tensor = std::conditional_t<
