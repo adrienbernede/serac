@@ -391,8 +391,21 @@ void gradient_matrix_kernel(mfem::Vector & K_e, derivatives_type* derivatives_pt
 	  [[maybe_unused]] auto dM_dx = dot(test_element::shape_function_gradients(xi_q), inv(J_q));
 	  [[maybe_unused]] auto dN_dx = dot(trial_element::shape_function_gradients(xi_q), inv(J_q));
 	  [[maybe_unused]] auto dstress_dgradu = std::get<1>(std::get<1>(dq_darg));
+	  // [[maybe_unused]] auto df0_du = std::get<0>(std::get<0>(dq_darg));
 	  auto temp1 = dot(dstress_dgradu, transpose(dN_dx));
+	  [[maybe_unused]] auto M = test_element::shape_functions(xi_q);
+	  [[maybe_unused]] auto N = trial_element::shape_functions(xi_q);
 	  K_elem += dot(dM_dx, temp1) * dx;
+	  // for (int i = 0; i < test_ndof; i++) {
+	  //   for (int id = 0; id < test_dim; id++) {
+	  //     for (int j = 0; j < trial_ndof; j++) {
+	  // 	for (int jd= 0; jd < trial_dim; jd++) {
+	  // 	  // maybe we should have a mapping for dofs x dim
+	  // 	  K_elem[i*test_dim + id][j*trial_dim + jd] += M[i]* df0_du * N[j] * dx;
+	  // 	}	      
+	  //     }
+	  //   }
+	  // }
 
 	  // if (e == 0 ) {
 	  //   std::cout << "Element : " << e << " " << q << std::endl;

@@ -310,10 +310,26 @@ void DiffusionIntegrator_AssembleElementMatrix
       w *= q;
       
       AddMult_a_AAt(w, dshapedxt, elmat);
-      // dshapedxt.Print();
-      //      elmat.Print();
     }
 }
+
+
+/* Start of dark arts to get at Bilinearform.mat*/
+template < typename From, auto V, typename Result> 
+struct forbidden
+{
+  friend Result _get_mat(From& from)
+  {
+    return from.*V;
+  }
+
+};
+
+mfem::SparseMatrix* _get_mat(mfem::ParBilinearForm&);
+
+template struct forbidden<mfem::ParBilinearForm, &mfem::ParBilinearForm::mat, mfem::SparseMatrix *>;
+
+/* End of dark arts */
 
 template <int p, int dim>
 void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimension<dim>)
@@ -327,12 +343,23 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
   ParBilinearForm A(&fespace);
 
   ConstantCoefficient a_coef(a);
-  A.AddDomainIntegrator(new MassIntegrator(a_coef));
+  //  A.AddDomainIntegrator(new MassIntegrator(a_coef));
 
   ConstantCoefficient b_coef(b);
-  A.AddDomainIntegrator(new DiffusionIntegrator(b_coef));
-  A.Assemble(0);
+  auto diff_integ = new DiffusionIntegrator(b_coef);
+
+  //modify integration rule temporarily to match weak_form?
+  auto trial_fe = fespace.GetFE(0);
+  int order = 2;
+  diff_integ->SetIntRule(&mfem::IntRules.Get(trial_fe->GetGeomType(), order));
+  A.AddDomainIntegrator(diff_integ);
+  constexpr int skip_zeros = 0;
+  A.Assemble(skip_zeros);
   A.Finalize();
+
+  // Save a deep-copy of rank local assembled sparse matrix
+  mfem::SparseMatrix A_spmat_mfem (*_get_mat(A));
+  
   std::unique_ptr<mfem::HypreParMatrix> J(A.ParallelAssemble());
 
   ParLinearForm       f(&fespace);
@@ -355,9 +382,9 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
 
   residual.AddDomainIntegral(
       Dimension<dim>{},
-      [&](auto x, auto temperature) {
+      [&]([[maybe_unused]] auto x, auto temperature) {
         auto [u, du_dx] = temperature;
-        auto f0         = a * u - (100 * x[0] * x[1]);
+        auto f0         =  - (100 * x[0] * x[1]); //+ a * u;
         auto f1         = b * du_dx;
         return std::tuple{f0, f1};
       },
@@ -388,13 +415,16 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
   Array< int > dofs;
   fespace.GetElementDofs (0, dofs);
   mfem::Vector K_e(mesh.GetNE() * dofs.Size() * fespace.GetVDim() * dofs.Size() * fespace.GetVDim() );
+  K_e = 0.;
   residual.GradientMatrix(K_e);
   std::cout << "K_e: (" << K_e.Size() << ")" << std::endl << std::endl;;
 
   // Reprocess each element from LEXICOGRAPHIC -> NATIVE for the tensorbasiscase
   auto inv_dof_map = dynamic_cast<const mfem::TensorBasisElement *>(fespace.GetFE(0))->GetDofMap(); // for quads the change from NATIVE -> lexicographic is the same
+
+  mfem::SparseMatrix A_spmat_weak (A_spmat_mfem.Height());
+  constexpr auto ordering_type = mfem::Ordering::byNODES;
   {
-    constexpr auto ordering_type = mfem::Ordering::byNODES;
     auto dk = mfem::Reshape(K_e.ReadWrite(), dofs.Size() * fespace.GetVDim(), dofs.Size() * fespace.GetVDim(), mesh.GetNE());
     for (int e = 0; e < mesh.GetNE(); e++) {
       DenseMatrix mat(dofs.Size() * fespace.GetVDim());
@@ -422,13 +452,20 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
 	    }
 	  }
 	}
-      }          
+      }
+
+      Array<int> elem_vdofs;
+      fespace.GetElementVDofs(e, elem_vdofs);
+      A_spmat_weak.AddSubMatrix(elem_vdofs, elem_vdofs, mat, skip_zeros);
     }
   }
+  A_spmat_weak.Finalize();
 
   
   // Grab all the elements from mfem Bilinearform
+  mfem::SparseMatrix A_spmat_mfem2 (A_spmat_mfem.Height());
   mfem::Vector K_e_mfem(mesh.GetNE() * dofs.Size() * fespace.GetVDim() * dofs.Size() * fespace.GetVDim() );
+  K_e_mfem = 0.;
   {
     auto dk = mfem::Reshape(K_e_mfem.ReadWrite(), dofs.Size() * fespace.GetVDim(), dofs.Size() * fespace.GetVDim(), mesh.GetNE());
     for (int e = 0; e < mesh.GetNE(); e++) {
@@ -439,13 +476,42 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
 	  dk(i,j,e) = mat(i,j);
 	}
       }
+
+
+      DenseMatrix mat2;
+      diff_integ->AssembleElementMatrix(*(fespace.GetFE(e)), *(fespace.GetElementTransformation(e)), mat2);
+      for (int i = 0; i < mat.Height(); i++) {
+	for (int j = 0; j < mat.Width(); j++) {
+	  EXPECT_NEAR(mat(i,j), mat2(i,j), 1.e-10);
+	}
+      }
+
+      Array<int> elem_vdofs;
+      fespace.GetElementVDofs(e, elem_vdofs);
+      A_spmat_mfem2.AddSubMatrix(elem_vdofs, elem_vdofs, mat, skip_zeros);      
+
     }
   }
+  A_spmat_mfem2.Finalize();
 
+  // check all the element contributions
   for (int i = 0; i < K_e.Size(); i++) {
     EXPECT_NEAR(K_e_mfem[i], K_e[i], 1.e-10);
   }
- 
+
+
+  // check assembled matrices
+  // for (int i = 0; i < A_spmat_weak.NumNonZeroElems(); i++) {
+  //   EXPECT_NEAR(A_spmat_mfem2.GetData()[i], A_spmat_mfem.GetData()[i], 1.e-10);
+  // }
+
+  for (int r = 0; r < A_spmat_weak.Height(); r++) {
+    auto columns = A_spmat_weak.GetRowColumns(r);
+    for (int c = 0; c < A_spmat_weak.RowSize(r); c++) {
+      EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_spmat_weak(r, columns[c]), 1.e-10);
+    }
+  }
+  
 }
 
 
