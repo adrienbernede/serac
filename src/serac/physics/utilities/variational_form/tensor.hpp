@@ -158,6 +158,14 @@ struct zero {
   }
 };
 
+template <typename T>
+struct is_zero : std::false_type {
+};
+
+template <>
+struct is_zero<zero> : std::true_type {
+};
+
 constexpr auto operator+(zero, zero) { return zero{}; }
 
 template <typename T>
@@ -1103,7 +1111,6 @@ auto convert(T value)
   A[0][0][0] = value;
   return A;
 }
-
 
 /*
 tuple<double, double, double> output = chain_rule(
