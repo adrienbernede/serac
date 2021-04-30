@@ -466,6 +466,8 @@ TEST(thermal, 2D_quadratic) { weak_form_test(*mesh2D, H1<2>{}, H1<2>{}, Dimensio
 TEST(thermal, 2D_cubic) { weak_form_test(*mesh2D, H1<3>{}, H1<3>{}, Dimension<2>{}); }
 
 TEST(thermal, 2D_linear_mat) { weak_form_matrix_test(*mesh2D, H1<1>{}, H1<1>{}, Dimension<2>{}); }
+TEST(thermal, 2D_quadratic_mat) { weak_form_matrix_test(*mesh2D, H1<2>{}, H1<2>{}, Dimension<2>{}); }
+TEST(thermal, 2D_cubic_mat) { weak_form_test(*mesh2D, H1<3>{}, H1<3>{}, Dimension<2>{}); }
 
 // TEST(thermal, 3D_linear) { weak_form_test(*mesh3D, H1<1>{}, H1<1>{}, Dimension<3>{}); }
 // TEST(thermal, 3D_quadratic) { weak_form_test(*mesh3D, H1<2>{}, H1<2>{}, Dimension<3>{}); }
