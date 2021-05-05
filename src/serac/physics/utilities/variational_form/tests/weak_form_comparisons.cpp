@@ -64,8 +64,7 @@ namespace mfem_ext {
       [[maybe_unused]] const int nnz = FillI();
       GetMemoryJ().New(nnz, GetMemoryJ().GetMemoryType());
       GetMemoryData().New(nnz, GetMemoryData().GetMemoryType());
-      //      FillJAndData(mat_ea);
-   
+      FillJ();   
     }
 
     int FillI();
@@ -100,9 +99,11 @@ namespace mfem_ext {
     const int test_ndofs = test_fes.GetNDofs();
 
     auto I = ReadWriteI();
-    I = 0;
+    for (int i = 0; i < test_vdim * test_ndofs; i++) {
+      I[i] = 0;
+    }
     
-    for (int test_vdof = 0; test_fes.GetNDofs(); test_vdof++) {
+    for (int test_vdof = 0; test_vdof < test_fes.GetNDofs(); test_vdof++) {
 
       // Look through each element corresponding to a test_vdof
       const int test_row_offset = test_offsets[test_vdof];
@@ -170,7 +171,7 @@ namespace mfem_ext {
     ea_map.SetSize(test_elem_dof * test_vdim * trial_elem_dof * trial_vdim * ne);
     auto map_ea = Reshape(ea_map.ReadWrite(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
     
-    for (int test_vdof = 0; test_fes.GetNDofs(); test_vdof++) {
+    for (int test_vdof = 0; test_vdof < test_fes.GetNDofs(); test_vdof++) {
 
       // Look through each element corresponding to a test_vdof
       const int test_row_offset = test_offsets[test_vdof];
@@ -707,8 +708,8 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
   // A_spmat_weak.Finalize();
 
   mfem::SparseMatrix                  A_spmat_weak(A_spmat_mfem.Height());
-  mfem::ElementRestriction ElementRestriction(fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
-  ElementRestriction.FillSparseMatrix(K_e, A_spmat_weak);
+  mfem::ElementRestriction elemRestriction(fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
+  elemRestriction.FillSparseMatrix(K_e, A_spmat_weak);
   A_spmat_weak.Finalize();
 
   for (int r = 0; r < A_spmat_weak.Height(); r++) {
@@ -717,6 +718,20 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
       EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_spmat_weak(r, columns[c]), 1.e-10);
     }
   }
+
+  // test AssembledSparseMatrix
+  serac::mfem_ext::AssembledSparseMatrix A_serac_mat(fespace, fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
+  A_serac_mat.FillData(K_e);
+  A_serac_mat.Finalize();
+  
+  for (int r = 0; r < A_serac_mat.Height(); r++) {
+    auto columns = A_serac_mat.GetRowColumns(r);
+    for (int c = 0; c < A_serac_mat.RowSize(r); c++) {
+      EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_serac_mat(r, columns[c]), 1.e-10);
+    }
+  }
+
+  
 }
 
 template <int p, int dim>
