@@ -61,10 +61,16 @@ namespace mfem_ext {
     {
       GetMemoryI().New(Height()+1, GetMemoryI().GetMemoryType());
       
-      [[maybe_unused]] const int nnz = FillI();
+      const int nnz = FillI();
       GetMemoryJ().New(nnz, GetMemoryJ().GetMemoryType());
       GetMemoryData().New(nnz, GetMemoryData().GetMemoryType());
-      FillJ();   
+      FillJ();
+      
+      // zero initialize the data
+      for (int i = 0; i < nnz; i++) {
+	A[i] = 0.;
+      }
+      
     }
 
     int FillI();
@@ -268,10 +274,6 @@ namespace mfem_ext {
     auto map_ea = Reshape(ea_map.Read(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
 
     auto mat_ea = Reshape(ea_data.Read(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
-    // zero initialize
-    for (int i = 0; i < this->A.Capacity(); i++) {
-      this->A[i] = 0.;
-    }
     
     // Use map_ea to take ea_data directly to CSR entry
     for (int e = 0; e < ne ; e++ ){
@@ -923,6 +925,94 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
   A_spmat_mfem.Print();
 }
 
+template <int p, int dim>
+void weak_form_matrix_test(mfem::ParMesh& mesh, Hcurl<p> test, Hcurl<p> trial, Dimension<dim>)
+{
+  static constexpr double a = 1.7;
+  static constexpr double b = 2.1;
+
+  auto                  fec = ND_FECollection(p, dim);
+  ParFiniteElementSpace fespace(&mesh, &fec);
+
+  ParBilinearForm B(&fespace);
+
+  ConstantCoefficient a_coef(a);
+  B.AddDomainIntegrator(new VectorFEMassIntegrator(a_coef));
+
+  ConstantCoefficient b_coef(b);
+  B.AddDomainIntegrator(new CurlCurlIntegrator(b_coef));
+  B.Assemble(0);
+  B.Finalize();
+
+  mfem::SparseMatrix                    B_spmat_mfem(*_get_mat(B));
+  std::unique_ptr<mfem::HypreParMatrix> J(B.ParallelAssemble());
+  
+  ParLinearForm             f(&fespace);
+  VectorFunctionCoefficient load_func(dim, [&](const Vector& coords, Vector& output) {
+    double x  = coords(0);
+    double y  = coords(1);
+    output    = 0.0;
+    output(0) = 10 * x * y;
+    output(1) = -5 * (x - y) * y;
+  });
+
+  f.AddDomainIntegrator(new VectorFEDomainLFIntegrator(load_func));
+  f.Assemble();
+  std::unique_ptr<mfem::HypreParVector> F(f.ParallelAssemble());
+
+  ParGridFunction u_global(&fespace);
+  u_global.Randomize();
+
+  Vector U(fespace.TrueVSize());
+  u_global.GetTrueDofs(U);
+
+  using test_space  = decltype(test);
+  using trial_space = decltype(trial);
+
+  WeakForm<test_space(trial_space)> residual(&fespace, &fespace);
+
+  residual.AddDomainIntegral(
+      Dimension<dim>{},
+      [&](auto x, auto vector_potential) {
+        auto [A, curl_A] = vector_potential;
+        auto f0          = a * A - tensor<double, dim>{10 * x[0] * x[1], -5 * (x[0] - x[1]) * x[1]};
+        auto f1          = b * curl_A;
+        return std::tuple{f0, f1};
+      },
+      mesh);
+
+  mfem::Vector r1 = (*J) * U - (*F);
+  mfem::Vector r2 = residual(U);
+
+  if (verbose) {
+    std::cout << "||r1||: " << r1.Norml2() << std::endl;
+    std::cout << "||r2||: " << r2.Norml2() << std::endl;
+    std::cout << "||r1-r2||/||r1||: " << mfem::Vector(r1 - r2).Norml2() / r1.Norml2() << std::endl;
+  }
+  EXPECT_NEAR(0., mfem::Vector(r1 - r2).Norml2() / r1.Norml2(), tol);
+
+  mfem::Operator& grad = residual.GetGradient(U);
+
+  mfem::Vector g1 = (*J) * U;
+  mfem::Vector g2 = grad * U;
+
+  if (verbose) {
+    std::cout << "||g1||: " << g1.Norml2() << std::endl;
+    std::cout << "||g2||: " << g2.Norml2() << std::endl;
+    std::cout << "||g1-g2||/||g1||: " << mfem::Vector(g1 - g2).Norml2() / g1.Norml2() << std::endl;
+  }
+  EXPECT_NEAR(0., mfem::Vector(g1 - g2).Norml2() / g1.Norml2(), tol);
+
+  Array<int> dofs;
+  fespace.GetElementDofs(0, dofs);
+  mfem::Vector K_e(mesh.GetNE() * dofs.Size() * fespace.GetVDim() * dofs.Size() * fespace.GetVDim());
+  K_e = 0.;
+  residual.GradientMatrix(K_e);
+  std::cout << "K_e: (" << K_e.Size() << ")" << std::endl << std::endl;
+  
+}
+
+
 // TEST(thermal, 2D_linear) { weak_form_test(*mesh2D, H1<1>{}, H1<1>{}, Dimension<2>{}); }
 // TEST(thermal, 2D_quadratic) { weak_form_test(*mesh2D, H1<2>{}, H1<2>{}, Dimension<2>{}); }
 // TEST(thermal, 2D_cubic) { weak_form_test(*mesh2D, H1<3>{}, H1<3>{}, Dimension<2>{}); }
@@ -943,7 +1033,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
 // TEST(hcurl, 2D_quadratic) { weak_form_test(*mesh2D, Hcurl<2>{}, Hcurl<2>{}, Dimension<2>{}); }
 // TEST(hcurl, 2D_cubic) { weak_form_test(*mesh2D, Hcurl<3>{}, Hcurl<3>{}, Dimension<2>{}); }
 
-// TEST(hcurl, 2D_linear_mat) { weak_form_matrix_test(*mesh2D, Hcurl<1>{}, Hcurl<1>{}, Dimension<2>{}); }
+TEST(hcurl, 2D_linear_mat) { weak_form_matrix_test(*mesh2D, Hcurl<1>{}, Hcurl<1>{}, Dimension<2>{}); }
 
 // TEST(hcurl, 3D_linear) { weak_form_test(*mesh3D, Hcurl<1>{}, Hcurl<1>{}, Dimension<3>{}); }
 // TEST(hcurl, 3D_quadratic) { weak_form_test(*mesh3D, Hcurl<2>{}, Hcurl<2>{}, Dimension<3>{}); }

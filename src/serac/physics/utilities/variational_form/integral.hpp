@@ -568,12 +568,21 @@ struct Integral {
       gradient_kernel<geometry, test_space, trial_space, geometry_dim, spatial_dim, Q>(dU, dR, qf_derivatives_ptr, J_,
                                                                                        num_elements);
     };
+
+    gradient_mat = [=](mfem::Vector& K_e) {
+      gradient_matrix_kernel<geometry, test_space, trial_space, geometry_dim, spatial_dim, Q>(K_e, qf_derivatives_ptr,
+                                                                                              J_, num_elements);
+    };
+
+    
   }
 
   void Mult(const mfem::Vector& input_E, mfem::Vector& output_E) const { evaluation(input_E, output_E); }
 
   void GradientMult(const mfem::Vector& input_E, mfem::Vector& output_E) const { gradient(input_E, output_E); }
 
+  void GradientMatrix(mfem::Vector& K_e) const { gradient_mat(K_e); }
+  
   const mfem::Vector J_;
   const mfem::Vector X_;
 

@@ -211,6 +211,8 @@ struct WeakForm<test(trial), std::enable_if_t<!is_H1_v<test>>> : public mfem::Op
     Evaluation<Operation::GradientMult>(input_T, output_T);
   }
 
+  virtual void GradientMatrix(mfem::Vector& K_e) const { domain_integrals[0].GradientMatrix(K_e); }
+  
   virtual mfem::Operator& GetGradient(const mfem::Vector& x) const
   {
     Mult(x, dummy);  // this is ugly
