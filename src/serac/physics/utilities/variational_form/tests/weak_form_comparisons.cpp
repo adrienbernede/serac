@@ -29,268 +29,262 @@ std::unique_ptr<mfem::ParMesh> mesh3D;
 template <auto offsetV, auto indicesV, auto gatherV>
 struct forbidden_restriction {
   //  friend result_fes _get_fes(From & from) { return & from.*fesV; }
-  friend mfem::Array<int> & __get_offsets(mfem::ElementRestriction & from) { return from.*offsetV; }
-  friend mfem::Array<int> & __get_indices(mfem::ElementRestriction & from) { return from.*indicesV; }
-  friend mfem::Array<int> & __get_gatherMap(mfem::ElementRestriction & from) { return from.*gatherV; }
+  friend mfem::Array<int>& __get_offsets(mfem::ElementRestriction& from) { return from.*offsetV; }
+  friend mfem::Array<int>& __get_indices(mfem::ElementRestriction& from) { return from.*indicesV; }
+  friend mfem::Array<int>& __get_gatherMap(mfem::ElementRestriction& from) { return from.*gatherV; }
 };
 
-//const FiniteElementSpace * __get_fes(mfem::ElementRestriction &);
-mfem::Array<int> & __get_offsets(mfem::ElementRestriction &);
-mfem::Array<int> & __get_indices(mfem::ElementRestriction &);
-mfem::Array<int> & __get_gatherMap(mfem::ElementRestriction &);
+// const FiniteElementSpace * __get_fes(mfem::ElementRestriction &);
+mfem::Array<int>& __get_offsets(mfem::ElementRestriction&);
+mfem::Array<int>& __get_indices(mfem::ElementRestriction&);
+mfem::Array<int>& __get_gatherMap(mfem::ElementRestriction&);
 
-template struct forbidden_restriction<&mfem::ElementRestriction::offsets,
-				      &mfem::ElementRestriction::indices,
-				      &mfem::ElementRestriction::gatherMap>;
-
+template struct forbidden_restriction<&mfem::ElementRestriction::offsets, &mfem::ElementRestriction::indices,
+                                      &mfem::ElementRestriction::gatherMap>;
 
 namespace serac {
-namespace mfem_ext {  
-  class AssembledSparseMatrix : public mfem::SparseMatrix
+namespace mfem_ext {
+class AssembledSparseMatrix : public mfem::SparseMatrix {
+public:
+  AssembledSparseMatrix(const mfem::FiniteElementSpace& test,   // test_elem_dofs * ne * vdim x vdim * test_ndofs
+                        const mfem::FiniteElementSpace& trial,  // trial_elem_dofs * ne * vdim x vdim * trial_ndofs
+                        mfem::ElementDofOrdering        elem_order)
+      : mfem::SparseMatrix(test.GetNDofs() * test.GetVDim(), trial.GetNDofs() * trial.GetVDim()),
+        test_fes(test),
+        trial_fes(trial),
+        test_restriction(test, elem_order),
+        trial_restriction(trial, elem_order),
+        elem_ordering(elem_order)
   {
-  public:
-    AssembledSparseMatrix(const mfem::FiniteElementSpace &test, // test_elem_dofs * ne * vdim x vdim * test_ndofs
-			  const mfem::FiniteElementSpace &trial, // trial_elem_dofs * ne * vdim x vdim * trial_ndofs
-			  mfem::ElementDofOrdering elem_order)
-      : mfem::SparseMatrix (test.GetNDofs() * test.GetVDim(), trial.GetNDofs() * trial.GetVDim()),
-      test_fes(test),
-      trial_fes(trial),
-      test_restriction(test, elem_order),
-      trial_restriction(trial, elem_order),
-      elem_ordering(elem_order)
-    {
-      GetMemoryI().New(Height()+1, GetMemoryI().GetMemoryType());
-      
-      const int nnz = FillI();
-      GetMemoryJ().New(nnz, GetMemoryJ().GetMemoryType());
-      GetMemoryData().New(nnz, GetMemoryData().GetMemoryType());
-      FillJ();
-      
-      // zero initialize the data
-      for (int i = 0; i < nnz; i++) {
-	A[i] = 0.;
+    GetMemoryI().New(Height() + 1, GetMemoryI().GetMemoryType());
+
+    const int nnz = FillI();
+    GetMemoryJ().New(nnz, GetMemoryJ().GetMemoryType());
+    GetMemoryData().New(nnz, GetMemoryData().GetMemoryType());
+    FillJ();
+
+    // zero initialize the data
+    for (int i = 0; i < nnz; i++) {
+      A[i] = 0.;
+    }
+  }
+
+  int  FillI();
+  void FillJ();
+  void FillData(const mfem::Vector& ea_data);
+
+protected:
+  const mfem::FiniteElementSpace& test_fes;
+  const mfem::FiniteElementSpace& trial_fes;
+  mfem::ElementRestriction        test_restriction;
+  mfem::ElementRestriction        trial_restriction;
+  mfem::ElementDofOrdering        elem_ordering;
+  mfem::Array<int>                ea_map;
+};
+
+int AssembledSparseMatrix::FillI()
+{
+  [[maybe_unused]] auto& test_offsets = __get_offsets(test_restriction);  // offsets for rows.. each row is a test_vdof
+  [[maybe_unused]] auto& test_indices =
+      __get_indices(test_restriction);  // returns (test_elem_dof , ne) id corresponding to a test_vdof_offset
+  [[maybe_unused]] auto& test_gatherMap  = __get_gatherMap(test_restriction);  // returns test_vdof
+  [[maybe_unused]] auto& trial_offsets   = __get_offsets(trial_restriction);
+  [[maybe_unused]] auto& trial_indices   = __get_indices(trial_restriction);
+  [[maybe_unused]] auto& trial_gatherMap = __get_gatherMap(trial_restriction);
+
+  /**
+     We expect mat_ea to be of size (test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne)
+     We assume a consistent striding from (elem_dof, vd) within each element
+
+   */
+  const int test_elem_dof  = test_fes.GetFE(0)->GetDof();
+  const int trial_elem_dof = trial_fes.GetFE(0)->GetDof();
+  const int test_vdim      = test_fes.GetVDim();
+  const int trial_vdim     = trial_fes.GetVDim();
+  const int test_ndofs     = test_fes.GetNDofs();
+
+  auto I = ReadWriteI();
+  for (int i = 0; i < test_vdim * test_ndofs; i++) {
+    I[i] = 0;
+  }
+
+  for (int test_vdof = 0; test_vdof < test_fes.GetNDofs(); test_vdof++) {
+    // Look through each element corresponding to a test_vdof
+    const int test_row_offset = test_offsets[test_vdof];
+    const int nrow_elems      = test_offsets[test_vdof + 1] - test_row_offset;
+
+    // Build temporary array to get rid of duplicates
+    mfem::Array<int> trial_vdofs(nrow_elems * trial_elem_dof);
+    trial_vdofs = -1;
+    int nnz_row = 0;
+    for (int e_index = 0; e_index < nrow_elems; e_index++) {
+      const int                  test_offset = test_indices[test_row_offset + e_index];
+      const int                  e           = test_offset / test_elem_dof;
+      [[maybe_unused]] const int test_i_elem = test_offset % test_elem_dof;
+
+      // find corresponding trial_vdofs
+      mfem::Array<int> trial_elem_vdofs(trial_elem_dof);
+      for (int j = 0; j < trial_elem_dof; j++) {
+        const auto trial_j_vdof = trial_gatherMap[trial_elem_dof * e + j];
+        trial_elem_vdofs[j]     = trial_j_vdof;
+        if (trial_vdofs.Find(trial_j_vdof) == -1) {
+          // we haven't seen this before
+          trial_vdofs[nnz_row] = trial_j_vdof;
+          nnz_row++;
+        }
       }
-      
     }
 
-    int FillI();
-    void FillJ();
-    void FillData(const mfem::Vector & ea_data);
-  protected:
-    const mfem::FiniteElementSpace & test_fes;
-    const mfem::FiniteElementSpace & trial_fes;
-    mfem::ElementRestriction test_restriction;
-    mfem::ElementRestriction trial_restriction;
-    mfem::ElementDofOrdering elem_ordering;
-    mfem::Array<int> ea_map;
-  };
-
-  int AssembledSparseMatrix::FillI() {
-    [[maybe_unused]] auto &test_offsets = __get_offsets(test_restriction); // offsets for rows.. each row is a test_vdof
-    [[maybe_unused]] auto &test_indices = __get_indices(test_restriction); // returns (test_elem_dof , ne) id corresponding to a test_vdof_offset
-    [[maybe_unused]] auto &test_gatherMap = __get_gatherMap(test_restriction); // returns test_vdof
-    [[maybe_unused]] auto &trial_offsets = __get_offsets(trial_restriction);
-    [[maybe_unused]] auto &trial_indices = __get_indices(trial_restriction);
-    [[maybe_unused]] auto &trial_gatherMap = __get_gatherMap(trial_restriction);
-
-    /**
-       We expect mat_ea to be of size (test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne)
-       We assume a consistent striding from (elem_dof, vd) within each element
-
-     */
-    const int test_elem_dof = test_fes.GetFE(0)->GetDof();
-    const int trial_elem_dof = trial_fes.GetFE(0)->GetDof();
-    const int test_vdim = test_fes.GetVDim();
-    const int trial_vdim = trial_fes.GetVDim();
-    const int test_ndofs = test_fes.GetNDofs();
-
-    auto I = ReadWriteI();
-    for (int i = 0; i < test_vdim * test_ndofs; i++) {
-      I[i] = 0;
+    // add entries to I
+    for (int vi = 0; vi < test_vdim; vi++) {
+      I[test_fes.DofToVDof(test_vdof, vi)] = nnz_row * trial_vdim;
     }
-    
-    for (int test_vdof = 0; test_vdof < test_fes.GetNDofs(); test_vdof++) {
+  }
 
-      // Look through each element corresponding to a test_vdof
-      const int test_row_offset = test_offsets[test_vdof];
-      const int nrow_elems = test_offsets[test_vdof+1] - test_row_offset;
+  // Perform inclusive scan on all entries
+  int nnz = 0;
+  for (int i = 0; i < test_ndofs * trial_vdim; i++) {
+    int temp = I[i];
+    I[i]     = nnz;
+    nnz += temp;
+  }
+  I[test_ndofs * trial_vdim] = nnz;
 
-      // Build temporary array to get rid of duplicates
-      mfem::Array<int> trial_vdofs(nrow_elems * trial_elem_dof);
-      trial_vdofs = -1;
-      int nnz_row = 0;
-      for (int e_index = 0; e_index < nrow_elems; e_index++) {
-	const int test_offset = test_indices[test_row_offset + e_index];
-	const int e = test_offset / test_elem_dof;
-	[[maybe_unused]] const int test_i_elem = test_offset % test_elem_dof;
+  return nnz;
+}
 
-	// find corresponding trial_vdofs
-	mfem::Array<int> trial_elem_vdofs(trial_elem_dof);
-	for (int j = 0; j < trial_elem_dof; j++) {
-	  const auto trial_j_vdof = trial_gatherMap[trial_elem_dof * e + j];
-	  trial_elem_vdofs[j] = trial_j_vdof;
-	  if (trial_vdofs.Find(trial_j_vdof) == -1) {
-	    // we haven't seen this before
-	    trial_vdofs[nnz_row] = trial_j_vdof;
-	    nnz_row++;
-	  }
-	}
+void AssembledSparseMatrix::FillJ()
+{
+  auto I = ReadWriteI();
+  auto J = WriteJ();
+
+  [[maybe_unused]] auto& test_offsets = __get_offsets(test_restriction);  // offsets for rows.. each row is a test_vdof
+  [[maybe_unused]] auto& test_indices =
+      __get_indices(test_restriction);  // returns (test_elem_dof , ne) id corresponding to a test_vdof_offset
+  [[maybe_unused]] auto& test_gatherMap  = __get_gatherMap(test_restriction);  // returns test_vdof
+  [[maybe_unused]] auto& trial_offsets   = __get_offsets(trial_restriction);
+  [[maybe_unused]] auto& trial_indices   = __get_indices(trial_restriction);
+  [[maybe_unused]] auto& trial_gatherMap = __get_gatherMap(trial_restriction);
+
+  const int                  test_elem_dof  = test_fes.GetFE(0)->GetDof();
+  const int                  trial_elem_dof = trial_fes.GetFE(0)->GetDof();
+  const int                  test_vdim      = test_fes.GetVDim();
+  const int                  trial_vdim     = trial_fes.GetVDim();
+  [[maybe_unused]] const int test_ndofs     = test_fes.GetNDofs();
+
+  const int ne = trial_fes.GetNE();
+  ea_map.SetSize(test_elem_dof * test_vdim * trial_elem_dof * trial_vdim * ne);
+  auto map_ea = Reshape(ea_map.ReadWrite(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
+
+  // initialize J
+  for (int j = 0; j < this->J.Capacity(); j++) {
+    this->J[j] = -1;
+  }
+
+  for (int test_vdof = 0; test_vdof < test_fes.GetNDofs(); test_vdof++) {
+    // Look through each element corresponding to a test_vdof
+    const int test_row_offset = test_offsets[test_vdof];
+    const int nrow_elems      = test_offsets[test_vdof + 1] - test_row_offset;
+
+    // here we assume all the components have the same number of columns
+    const int        nnz_row = I[test_fes.DofToVDof(test_vdof, 0) + 1] - I[test_fes.DofToVDof(test_vdof, 0)];
+    mfem::Array<int> trial_vdofs(nnz_row);
+    trial_vdofs      = -1;
+    int j_vdof_index = 0;
+
+    // Build temporary array for assembled J
+    for (int e_index = 0; e_index < nrow_elems; e_index++) {
+      const int                  test_offset = test_indices[test_row_offset + e_index];
+      const int                  e           = test_offset / test_elem_dof;
+      [[maybe_unused]] const int test_i_elem = test_offset % test_elem_dof;
+
+      // find corresponding trial_vdofs
+      mfem::Array<int> trial_elem_vdofs(trial_elem_dof);
+      for (int j_elem = 0; j_elem < trial_elem_dof; j_elem++) {
+        const auto trial_j_vdof  = trial_gatherMap[trial_elem_dof * e + j_elem];
+        trial_elem_vdofs[j_elem] = trial_j_vdof;
+
+        auto find_index = trial_vdofs.Find(trial_j_vdof);
+        if (find_index == -1) {
+          // we haven't seen this before
+          trial_vdofs[j_vdof_index] = trial_j_vdof;
+
+          // we can add this entry to J
+          for (int vi = 0; vi < test_vdim; vi++) {
+            const auto i_dof_offset = I[test_fes.DofToVDof(test_vdof, vi)];
+
+            // this access pattern corresnponds to j_vdof_index + vj * nnz_row
+            for (int vj = 0; vj < trial_vdim; vj++) {
+              const auto column_index = j_vdof_index + vj * nnz_row / trial_vdim;
+              const auto j_nnz_index  = i_dof_offset + column_index;
+              J[j_nnz_index]          = trial_fes.DofToVDof(trial_vdofs[j_vdof_index], vj);
+            }
+          }
+
+          // write mapping from ea to csr_nnz_index (can probably optimize this)
+          for (int vi = 0; vi < test_vdim; vi++) {
+            const auto i_dof_offset = I[test_fes.DofToVDof(test_vdof, vi)];
+            for (int vj = 0; vj < trial_vdim; vj++) {
+              const auto column_index = j_vdof_index + vj * nnz_row / trial_vdim;
+              map_ea(test_i_elem + test_elem_dof * vi, j_elem + trial_elem_dof * vj, e) = i_dof_offset + column_index;
+            }
+          }
+
+          j_vdof_index++;
+        } else {
+          // this is a duplicate entry
+          // write mapping from ea to csr_nnz_index (can probably optimize this)
+          for (int vi = 0; vi < test_vdim; vi++) {
+            const auto i_dof_offset = I[test_fes.DofToVDof(test_vdof, vi)];
+            for (int vj = 0; vj < trial_vdim; vj++) {
+              const auto column_index = find_index + vj * nnz_row / trial_vdim;
+              map_ea(test_i_elem + test_elem_dof * vi, j_elem + trial_elem_dof * vj, e) = i_dof_offset + column_index;
+            }
+          }
+        }
       }
+    }
+  }
+}
+void AssembledSparseMatrix::FillData(const mfem::Vector& ea_data)
+{
+  auto Data = WriteData();
 
-      // add entries to I
+  [[maybe_unused]] auto& test_offsets = __get_offsets(test_restriction);  // offsets for rows.. each row is a test_vdof
+  [[maybe_unused]] auto& test_indices =
+      __get_indices(test_restriction);  // returns (test_elem_dof , ne) id corresponding to a test_vdof_offset
+  [[maybe_unused]] auto& test_gatherMap  = __get_gatherMap(test_restriction);  // returns test_vdof
+  [[maybe_unused]] auto& trial_offsets   = __get_offsets(trial_restriction);
+  [[maybe_unused]] auto& trial_indices   = __get_indices(trial_restriction);
+  [[maybe_unused]] auto& trial_gatherMap = __get_gatherMap(trial_restriction);
+
+  const int                  test_elem_dof  = test_fes.GetFE(0)->GetDof();
+  const int                  trial_elem_dof = trial_fes.GetFE(0)->GetDof();
+  const int                  test_vdim      = test_fes.GetVDim();
+  const int                  trial_vdim     = trial_fes.GetVDim();
+  [[maybe_unused]] const int test_ndofs     = test_fes.GetNDofs();
+
+  const int ne = trial_fes.GetNE();
+
+  auto map_ea = Reshape(ea_map.Read(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
+
+  auto mat_ea = Reshape(ea_data.Read(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
+
+  // Use map_ea to take ea_data directly to CSR entry
+  for (int e = 0; e < ne; e++) {
+    for (int i_elem = 0; i_elem < test_elem_dof; i_elem++) {
       for (int vi = 0; vi < test_vdim; vi++) {
-	I[test_fes.DofToVDof(test_vdof, vi)] = nnz_row * trial_vdim;
-      }            
-    }
-
-    // Perform inclusive scan on all entries
-    int nnz = 0;
-    for (int i = 0; i < test_ndofs * trial_vdim; i++) {
-      int temp = I[i];
-      I[i] = nnz;
-      nnz += temp;
-    }
-    I[test_ndofs * trial_vdim] = nnz;
-    
-    return nnz;
-  }
-
-  void AssembledSparseMatrix::FillJ() {
-    auto I = ReadWriteI();
-    auto J = WriteJ();
-
-    [[maybe_unused]] auto &test_offsets = __get_offsets(test_restriction); // offsets for rows.. each row is a test_vdof
-    [[maybe_unused]] auto &test_indices = __get_indices(test_restriction); // returns (test_elem_dof , ne) id corresponding to a test_vdof_offset
-    [[maybe_unused]] auto &test_gatherMap = __get_gatherMap(test_restriction); // returns test_vdof
-    [[maybe_unused]] auto &trial_offsets = __get_offsets(trial_restriction);
-    [[maybe_unused]] auto &trial_indices = __get_indices(trial_restriction);
-    [[maybe_unused]] auto &trial_gatherMap = __get_gatherMap(trial_restriction);    
-    
-
-    const int test_elem_dof = test_fes.GetFE(0)->GetDof();
-    const int trial_elem_dof = trial_fes.GetFE(0)->GetDof();
-    const int test_vdim = test_fes.GetVDim();
-    const int trial_vdim = trial_fes.GetVDim();
-    [[maybe_unused]] const int test_ndofs = test_fes.GetNDofs();
-
-    const int ne = trial_fes.GetNE();
-    ea_map.SetSize(test_elem_dof * test_vdim * trial_elem_dof * trial_vdim * ne);
-    auto map_ea = Reshape(ea_map.ReadWrite(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
-
-    // initialize J
-    for (int j = 0; j < this->J.Capacity(); j++) {
-      this->J[j] = -1;
-    }
-    
-    for (int test_vdof = 0; test_vdof < test_fes.GetNDofs(); test_vdof++) {
-
-      // Look through each element corresponding to a test_vdof
-      const int test_row_offset = test_offsets[test_vdof];
-      const int nrow_elems = test_offsets[test_vdof+1] - test_row_offset;
-
-      // here we assume all the components have the same number of columns
-      const int nnz_row = I[test_fes.DofToVDof(test_vdof, 0)+1] - I[test_fes.DofToVDof(test_vdof, 0)];
-      mfem::Array<int> trial_vdofs(nnz_row);
-      trial_vdofs = -1;
-      int j_vdof_index = 0;
-      
-      // Build temporary array for assembled J
-      for (int e_index = 0; e_index < nrow_elems; e_index++) {
-	const int test_offset = test_indices[test_row_offset + e_index];
-	const int e = test_offset / test_elem_dof;
-	[[maybe_unused]] const int test_i_elem = test_offset % test_elem_dof;
-
-	// find corresponding trial_vdofs
-	mfem::Array<int> trial_elem_vdofs(trial_elem_dof);
-	for (int j_elem = 0; j_elem < trial_elem_dof; j_elem++) {
-	  const auto trial_j_vdof = trial_gatherMap[trial_elem_dof * e + j_elem];
-	  trial_elem_vdofs[j_elem] = trial_j_vdof;
-	  
-	  auto find_index = trial_vdofs.Find(trial_j_vdof);  	  
-	  if (find_index == -1) {
-	    // we haven't seen this before
-	    trial_vdofs[j_vdof_index] = trial_j_vdof;
-
-	    // we can add this entry to J
-	    for (int vi = 0; vi < test_vdim; vi++) {
-	      const auto i_dof_offset = I[test_fes.DofToVDof(test_vdof, vi)];
-
-	      // this access pattern corresnponds to j_vdof_index + vj * nnz_row
-	      for (int vj = 0; vj < trial_vdim; vj++) {
-		const auto column_index = j_vdof_index + vj * nnz_row/trial_vdim;
-		const auto j_nnz_index = i_dof_offset + column_index;
-		J[j_nnz_index] = trial_fes.DofToVDof(trial_vdofs[j_vdof_index], vj);		  
-	      }
-	    }	    
-
-	    // write mapping from ea to csr_nnz_index (can probably optimize this)
-	    for (int vi = 0; vi < test_vdim; vi++) {
-	      const auto i_dof_offset = I[test_fes.DofToVDof(test_vdof, vi)];
-	      for (int vj = 0; vj < trial_vdim; vj++) {
-		const auto column_index = j_vdof_index + vj * nnz_row/trial_vdim;
-		map_ea(test_i_elem + test_elem_dof * vi, j_elem + trial_elem_dof * vj, e) =
-		  i_dof_offset + column_index;
-	      }
-	    }
-
-	    j_vdof_index++;
-	  } else {
-	    // this is a duplicate entry
-	    // write mapping from ea to csr_nnz_index (can probably optimize this)
-	    for (int vi = 0; vi < test_vdim; vi++) {
-	      const auto i_dof_offset = I[test_fes.DofToVDof(test_vdof, vi)];
-	      for (int vj = 0; vj < trial_vdim; vj++) {
-		const auto column_index = find_index + vj * nnz_row/trial_vdim;
-		map_ea(test_i_elem + test_elem_dof * vi, j_elem + trial_elem_dof * vj, e) =
-		  i_dof_offset + column_index;
-	      }
-	    }
-	    
-	  }
-	}	
-      }
-    }
-
-  }
-  void AssembledSparseMatrix::FillData(const mfem::Vector &ea_data) {
-    auto Data = WriteData(); 
-    
-    [[maybe_unused]] auto &test_offsets = __get_offsets(test_restriction); // offsets for rows.. each row is a test_vdof
-    [[maybe_unused]] auto &test_indices = __get_indices(test_restriction); // returns (test_elem_dof , ne) id corresponding to a test_vdof_offset
-    [[maybe_unused]] auto &test_gatherMap = __get_gatherMap(test_restriction); // returns test_vdof
-    [[maybe_unused]] auto &trial_offsets = __get_offsets(trial_restriction);
-    [[maybe_unused]] auto &trial_indices = __get_indices(trial_restriction);
-    [[maybe_unused]] auto &trial_gatherMap = __get_gatherMap(trial_restriction);    
-    
-
-    const int test_elem_dof = test_fes.GetFE(0)->GetDof();
-    const int trial_elem_dof = trial_fes.GetFE(0)->GetDof();
-    const int test_vdim = test_fes.GetVDim();
-    const int trial_vdim = trial_fes.GetVDim();
-    [[maybe_unused]] const int test_ndofs = test_fes.GetNDofs();
-
-    const int ne = trial_fes.GetNE();
-    
-    auto map_ea = Reshape(ea_map.Read(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
-
-    auto mat_ea = Reshape(ea_data.Read(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
-    
-    // Use map_ea to take ea_data directly to CSR entry
-    for (int e = 0; e < ne ; e++ ){
-      for (int i_elem = 0; i_elem < test_elem_dof; i_elem++) {
-	for (int vi = 0; vi < test_vdim; vi++) {
-	  for (int j_elem = 0; j_elem < trial_elem_dof; j_elem++) {
-	    for (int vj = 0; vj < trial_vdim ; vj++) {
-	      Data[map_ea(i_elem + vi * test_elem_dof, j_elem + vj * trial_elem_dof, e)] +=
-		mat_ea(i_elem + vi * test_elem_dof, j_elem + vj * trial_elem_dof, e);
-	    }
-	  }
-	}
+        for (int j_elem = 0; j_elem < trial_elem_dof; j_elem++) {
+          for (int vj = 0; vj < trial_vdim; vj++) {
+            Data[map_ea(i_elem + vi * test_elem_dof, j_elem + vj * trial_elem_dof, e)] +=
+                mat_ea(i_elem + vi * test_elem_dof, j_elem + vj * trial_elem_dof, e);
+          }
+        }
       }
     }
   }
+}
 
-  
 }  // namespace mfem_ext
 
 }  // namespace serac
@@ -718,7 +712,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
   // }
   // A_spmat_weak.Finalize();
 
-  mfem::SparseMatrix                  A_spmat_weak(A_spmat_mfem.Height());
+  mfem::SparseMatrix       A_spmat_weak(A_spmat_mfem.Height());
   mfem::ElementRestriction elemRestriction(fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
   elemRestriction.FillSparseMatrix(K_e, A_spmat_weak);
   A_spmat_weak.Finalize();
@@ -734,7 +728,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
   serac::mfem_ext::AssembledSparseMatrix A_serac_mat(fespace, fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
   A_serac_mat.FillData(K_e);
   A_serac_mat.Finalize();
-  
+
   for (int r = 0; r < A_serac_mat.Height(); r++) {
     auto columns = A_serac_mat.GetRowColumns(r);
     std::cout << "row " << r << " : " << A_spmat_mfem.RowSize(r) << std::endl;
@@ -742,8 +736,6 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
       EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_serac_mat(r, columns[c]), 1.e-10);
     }
   }
-
-  
 }
 
 template <int p, int dim>
@@ -763,7 +755,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
 
   ConstantCoefficient lambda_coef(b);
   ConstantCoefficient mu_coef(b);
-  auto EI = new ElasticityIntegrator(lambda_coef, mu_coef);
+  auto                EI = new ElasticityIntegrator(lambda_coef, mu_coef);
   A.AddDomainIntegrator(EI);
   constexpr int skip_zeros = 0;
   A.Assemble(skip_zeros);
@@ -887,7 +879,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
     //    }
   }
   // A_spmat_weak.Finalize();
-  mfem::SparseMatrix           A_spmat_weak(A_spmat_mfem.Height());
+  mfem::SparseMatrix       A_spmat_weak(A_spmat_mfem.Height());
   mfem::ElementRestriction ElementRestriction(fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
   ElementRestriction.FillSparseMatrix(K_e, A_spmat_weak);
   A_spmat_weak.Finalize();
@@ -904,14 +896,14 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
   serac::mfem_ext::AssembledSparseMatrix A_serac_mat(fespace, fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
   A_serac_mat.FillData(K_e);
   A_serac_mat.Finalize();
-  
+
   // for (int r = 0; r < A_serac_mat.Height(); r++) {
   //   auto columns = A_serac_mat.GetRowColumns(r);
   //   for (int c = 0; c < A_serac_mat.RowSize(r); c++) {
   //     EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_serac_mat(r, columns[c]), 1.e-10);
   //   }
   // }
-  
+
   for (int r = 0; r < A_spmat_mfem.Height(); r++) {
     auto columns = A_spmat_mfem.GetRowColumns(r);
     std::cout << "row " << r << " : " << A_spmat_mfem.RowSize(r) << std::endl;
@@ -946,7 +938,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, Hcurl<p> test, Hcurl<p> trial, D
 
   mfem::SparseMatrix                    B_spmat_mfem(*_get_mat(B));
   std::unique_ptr<mfem::HypreParMatrix> J(B.ParallelAssemble());
-  
+
   ParLinearForm             f(&fespace);
   VectorFunctionCoefficient load_func(dim, [&](const Vector& coords, Vector& output) {
     double x  = coords(0);
@@ -1009,9 +1001,23 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, Hcurl<p> test, Hcurl<p> trial, D
   K_e = 0.;
   residual.GradientMatrix(K_e);
   std::cout << "K_e: (" << K_e.Size() << ")" << std::endl << std::endl;
-  
-}
 
+  serac::mfem_ext::AssembledSparseMatrix B_serac_mat(fespace, fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
+  B_serac_mat.FillData(K_e);
+  B_serac_mat.Finalize();
+
+  for (int r = 0; r < B_spmat_mfem.Height(); r++) {
+    auto columns = B_spmat_mfem.GetRowColumns(r);
+    std::cout << "row " << r << " : " << B_spmat_mfem.RowSize(r) << std::endl;
+    for (int c = 0; c < B_spmat_mfem.RowSize(r); c++) {
+      EXPECT_NEAR(B_spmat_mfem(r, columns[c]), B_serac_mat(r, columns[c]), 1.e-10);
+    }
+  }
+
+  B_serac_mat.Print();
+
+  B_spmat_mfem.Print();
+}
 
 // TEST(thermal, 2D_linear) { weak_form_test(*mesh2D, H1<1>{}, H1<1>{}, Dimension<2>{}); }
 // TEST(thermal, 2D_quadratic) { weak_form_test(*mesh2D, H1<2>{}, H1<2>{}, Dimension<2>{}); }
