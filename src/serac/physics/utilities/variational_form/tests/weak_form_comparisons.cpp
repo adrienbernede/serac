@@ -824,7 +824,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
     std::cout << "||r2||: " << r2.Norml2() << std::endl;
     std::cout << "||r1-r2||/||r1||: " << mfem::Vector(r1 - r2).Norml2() / r1.Norml2() << std::endl;
   }
-  //  EXPECT_NEAR(0., mfem::Vector(r1 - r2).Norml2() / r1.Norml2(), tol);
+  EXPECT_NEAR(0., mfem::Vector(r1 - r2).Norml2() / r1.Norml2(), tol);
 
   mfem::Operator& grad = residual.GetGradient(U);
 
@@ -836,7 +836,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
     std::cout << "||g2||: " << g2.Norml2() << std::endl;
     std::cout << "||g1-g2||/||g1||: " << mfem::Vector(g1 - g2).Norml2() / g1.Norml2() << std::endl;
   }
-  // EXPECT_NEAR(0., mfem::Vector(g1 - g2).Norml2() / g1.Norml2(), tol);
+  EXPECT_NEAR(0., mfem::Vector(g1 - g2).Norml2() / g1.Norml2(), tol);
 
   Array<int> dofs;
   fespace.GetElementDofs(0, dofs);
@@ -845,81 +845,9 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
   residual.GradientMatrix(K_e);
   std::cout << "K_e: (" << K_e.Size() << ")" << std::endl << std::endl;
 
-  // Reprocess each element from LEXICOGRAPHIC -> NATIVE for the tensorbasiscase
-  // auto inv_dof_map = dynamic_cast<const mfem::TensorBasisElement*>(fespace.GetFE(0))
-  //   ->GetDofMap();  // for quads the change from NATIVE -> lexicographic is the same
-
-  // mfem::SparseMatrix A_spmat_weak(A_spmat_mfem.Height());
-  // [[maybe_unused]] constexpr auto     ordering_type = mfem::Ordering::byNODES;
-  // {
-  auto dk =
-      mfem::Reshape(K_e.ReadWrite(), dofs.Size() * fespace.GetVDim(), dofs.Size() * fespace.GetVDim(), mesh.GetNE());
-  for (int e = 0; e < mesh.GetNE(); e++) {
-    DenseMatrix mat(dofs.Size() * fespace.GetVDim());
-    // for (int i = 0; i < dofs.Size(); i++) {
-    //   for (int id = 0; id < fespace.GetVDim(); id++) {
-    //     for (int j = 0; j < dofs.Size(); j++) {
-    //       for (int jd = 0; jd < fespace.GetVDim(); jd++) {
-    //         int inv_i_vdof = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), inv_dof_map[i], id);
-    //         int inv_j_vdof = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), inv_dof_map[j], jd);
-    //         int i_vdof     = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), i, id);
-    //         int j_vdof     = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), j, id);
-    //         mat(inv_i_vdof, inv_j_vdof) = dk(i_vdof, j_vdof, e);
-    //       }
-    //     }
-    //   }
-    // }
-    // Copy back
-    for (int i = 0; i < dofs.Size(); i++) {
-      for (int id = 0; id < fespace.GetVDim(); id++) {
-        for (int j = 0; j < dofs.Size(); j++) {
-          for (int jd = 0; jd < fespace.GetVDim(); jd++) {
-            // int i_vdof            = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), i, id);
-            // int j_vdof            = mfem::Ordering::Map<ordering_type>(dofs.Size(), fespace.GetVDim(), j, id);
-            //	       dk(i_vdof, j_vdof, e) = mat(i_vdof, j_vdof);
-            // mat(i_vdof, j_vdof) = dk(i_vdof, j_vdof, e);
-            int i_index           = i + dofs.Size() * id;
-            int j_index           = j + dofs.Size() * jd;
-            mat(i_index, j_index) = dk(i_index, j_index, e);
-          }
-        }
-      }
-    }
-
-    // Array<int> elem_vdofs;
-    // fespace.GetElementVDofs(e, elem_vdofs);
-    // A_spmat_weak.AddSubMatrix(elem_vdofs, elem_vdofs, mat, skip_zeros);
-
-    if (e == 0) {
-      mat.Print();
-    }
-    //    }
-  }
-  // A_spmat_weak.Finalize();
-  mfem::SparseMatrix       A_spmat_weak(A_spmat_mfem.Height());
-  mfem::ElementRestriction ElementRestriction(fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
-  ElementRestriction.FillSparseMatrix(K_e, A_spmat_weak);
-  A_spmat_weak.Finalize();
-
-  // Let's check element 0
-  for (int e = 0; e < 1; e++) {
-    auto              Trans = fespace.GetElementTransformation(e);
-    auto              FE    = fespace.GetFE(e);
-    mfem::DenseMatrix elmat;
-    VMI->AssembleElementMatrix(*FE, *Trans, elmat);
-    elmat.Print();
-  }
-
   serac::mfem_ext::AssembledSparseMatrix A_serac_mat(fespace, fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
   A_serac_mat.FillData(K_e);
   A_serac_mat.Finalize();
-
-  // for (int r = 0; r < A_serac_mat.Height(); r++) {
-  //   auto columns = A_serac_mat.GetRowColumns(r);
-  //   for (int c = 0; c < A_serac_mat.RowSize(r); c++) {
-  //     EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_serac_mat(r, columns[c]), 1.e-10);
-  //   }
-  // }
 
   for (int r = 0; r < A_spmat_mfem.Height(); r++) {
     auto columns = A_spmat_mfem.GetRowColumns(r);
