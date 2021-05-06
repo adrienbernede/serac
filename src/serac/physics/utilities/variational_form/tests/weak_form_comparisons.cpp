@@ -170,6 +170,11 @@ namespace mfem_ext {
     const int ne = trial_fes.GetNE();
     ea_map.SetSize(test_elem_dof * test_vdim * trial_elem_dof * trial_vdim * ne);
     auto map_ea = Reshape(ea_map.ReadWrite(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
+
+    // initialize J
+    for (int j = 0; j < this->J.Capacity(); j++) {
+      this->J[j] = -1;
+    }
     
     for (int test_vdof = 0; test_vdof < test_fes.GetNDofs(); test_vdof++) {
 
@@ -204,10 +209,11 @@ namespace mfem_ext {
 	    for (int vi = 0; vi < test_vdim; vi++) {
 	      const auto i_dof_offset = I[test_fes.DofToVDof(test_vdof, vi)];
 
-	      // this access pattern corresnponds to j_vdof_index + vj * nnz_rowj
+	      // this access pattern corresnponds to j_vdof_index + vj * nnz_row
 	      for (int vj = 0; vj < trial_vdim; vj++) {
-		const auto column_index = j_vdof_index + vj * nnz_row;
-		J[i_dof_offset + column_index] = trial_fes.DofToVDof(trial_vdofs[j_vdof_index], vj);		
+		const auto column_index = j_vdof_index + vj * nnz_row/trial_vdim;
+		const auto j_nnz_index = i_dof_offset + column_index;
+		J[j_nnz_index] = trial_fes.DofToVDof(trial_vdofs[j_vdof_index], vj);		  
 	      }
 	    }	    
 
@@ -215,7 +221,7 @@ namespace mfem_ext {
 	    for (int vi = 0; vi < test_vdim; vi++) {
 	      const auto i_dof_offset = I[test_fes.DofToVDof(test_vdof, vi)];
 	      for (int vj = 0; vj < trial_vdim; vj++) {
-		const auto column_index = j_vdof_index + vj * nnz_row;
+		const auto column_index = j_vdof_index + vj * nnz_row/trial_vdim;
 		map_ea(test_i_elem + test_elem_dof * vi, j_elem + trial_elem_dof * vj, e) =
 		  i_dof_offset + column_index;
 	      }
@@ -228,7 +234,7 @@ namespace mfem_ext {
 	    for (int vi = 0; vi < test_vdim; vi++) {
 	      const auto i_dof_offset = I[test_fes.DofToVDof(test_vdof, vi)];
 	      for (int vj = 0; vj < trial_vdim; vj++) {
-		const auto column_index = trial_vdofs[find_index] + vj * nnz_row;
+		const auto column_index = find_index + vj * nnz_row/trial_vdim;
 		map_ea(test_i_elem + test_elem_dof * vi, j_elem + trial_elem_dof * vj, e) =
 		  i_dof_offset + column_index;
 	      }
@@ -241,7 +247,7 @@ namespace mfem_ext {
 
   }
   void AssembledSparseMatrix::FillData(const mfem::Vector &ea_data) {
-    auto Data = WriteData(); // TODO initialize data
+    auto Data = WriteData(); 
     
     [[maybe_unused]] auto &test_offsets = __get_offsets(test_restriction); // offsets for rows.. each row is a test_vdof
     [[maybe_unused]] auto &test_indices = __get_indices(test_restriction); // returns (test_elem_dof , ne) id corresponding to a test_vdof_offset
@@ -262,7 +268,10 @@ namespace mfem_ext {
     auto map_ea = Reshape(ea_map.Read(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
 
     auto mat_ea = Reshape(ea_data.Read(), test_elem_dof * test_vdim, trial_elem_dof * trial_vdim, ne);
-
+    // zero initialize
+    for (int i = 0; i < this->A.Capacity(); i++) {
+      this->A[i] = 0.;
+    }
     
     // Use map_ea to take ea_data directly to CSR entry
     for (int e = 0; e < ne ; e++ ){
@@ -726,6 +735,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
   
   for (int r = 0; r < A_serac_mat.Height(); r++) {
     auto columns = A_serac_mat.GetRowColumns(r);
+    std::cout << "row " << r << " : " << A_spmat_mfem.RowSize(r) << std::endl;
     for (int c = 0; c < A_serac_mat.RowSize(r); c++) {
       EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_serac_mat(r, columns[c]), 1.e-10);
     }
@@ -889,15 +899,26 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
     elmat.Print();
   }
 
-  for (int r = 0; r < 2 /*A_spmat_weak.Height()*/; r++) {
-    auto columns = A_spmat_weak.GetRowColumns(r);
-    std::cout << "row " << r << " : " << A_spmat_weak.RowSize(r) << std::endl;
-    for (int c = 0; c < A_spmat_weak.RowSize(r); c++) {
-      EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_spmat_weak(r, columns[c]), 1.e-5);
+  serac::mfem_ext::AssembledSparseMatrix A_serac_mat(fespace, fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
+  A_serac_mat.FillData(K_e);
+  A_serac_mat.Finalize();
+  
+  // for (int r = 0; r < A_serac_mat.Height(); r++) {
+  //   auto columns = A_serac_mat.GetRowColumns(r);
+  //   for (int c = 0; c < A_serac_mat.RowSize(r); c++) {
+  //     EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_serac_mat(r, columns[c]), 1.e-10);
+  //   }
+  // }
+  
+  for (int r = 0; r < A_spmat_mfem.Height(); r++) {
+    auto columns = A_spmat_mfem.GetRowColumns(r);
+    std::cout << "row " << r << " : " << A_spmat_mfem.RowSize(r) << std::endl;
+    for (int c = 0; c < A_spmat_mfem.RowSize(r); c++) {
+      EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_serac_mat(r, columns[c]), 1.e-10);
     }
   }
 
-  A_spmat_weak.Print();
+  A_serac_mat.Print();
 
   A_spmat_mfem.Print();
 }
@@ -906,7 +927,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
 // TEST(thermal, 2D_quadratic) { weak_form_test(*mesh2D, H1<2>{}, H1<2>{}, Dimension<2>{}); }
 // TEST(thermal, 2D_cubic) { weak_form_test(*mesh2D, H1<3>{}, H1<3>{}, Dimension<2>{}); }
 
-TEST(thermal, 2D_linear_mat) { weak_form_matrix_test(*mesh2D, H1<1>{}, H1<1>{}, Dimension<2>{}); }
+// TEST(thermal, 2D_linear_mat) { weak_form_matrix_test(*mesh2D, H1<1>{}, H1<1>{}, Dimension<2>{}); }
 // TEST(thermal, 2D_quadratic_mat) { weak_form_matrix_test(*mesh2D, H1<2>{}, H1<2>{}, Dimension<2>{}); }
 // TEST(thermal, 2D_cubic_mat) { weak_form_test(*mesh2D, H1<3>{}, H1<3>{}, Dimension<2>{}); }
 
@@ -922,19 +943,24 @@ TEST(thermal, 2D_linear_mat) { weak_form_matrix_test(*mesh2D, H1<1>{}, H1<1>{}, 
 // TEST(hcurl, 2D_quadratic) { weak_form_test(*mesh2D, Hcurl<2>{}, Hcurl<2>{}, Dimension<2>{}); }
 // TEST(hcurl, 2D_cubic) { weak_form_test(*mesh2D, Hcurl<3>{}, Hcurl<3>{}, Dimension<2>{}); }
 
+// TEST(hcurl, 2D_linear) { weak_form_test(*mesh2D, Hcurl<1>{}, Hcurl<1>{}, Dimension<2>{}); }
+
 // TEST(hcurl, 3D_linear) { weak_form_test(*mesh3D, Hcurl<1>{}, Hcurl<1>{}, Dimension<3>{}); }
 // TEST(hcurl, 3D_quadratic) { weak_form_test(*mesh3D, Hcurl<2>{}, Hcurl<2>{}, Dimension<3>{}); }
 // TEST(hcurl, 3D_cubic) { weak_form_test(*mesh3D, Hcurl<3>{}, Hcurl<3>{}, Dimension<3>{}); }
 
-TEST(elasticity, 2D_linear) { weak_form_test(*mesh2D, H1<1, 2>{}, H1<1, 2>{}, Dimension<2>{}); }
+// TEST(elasticity, 2D_linear) { weak_form_test(*mesh2D, H1<1, 2>{}, H1<1, 2>{}, Dimension<2>{}); }
 // TEST(elasticity, 2D_quadratic) { weak_form_test(*mesh2D, H1<2, 2>{}, H1<2, 2>{}, Dimension<2>{}); }
 // TEST(elasticity, 2D_cubic) { weak_form_test(*mesh2D, H1<3, 2>{}, H1<3, 2>{}, Dimension<2>{}); }
 
-TEST(elasticity, 2D_linear_mat) { weak_form_matrix_test(*mesh2D, H1<1, 2>{}, H1<1, 2>{}, Dimension<2>{}); }
+//TEST(elasticity, 2D_linear_mat) { weak_form_matrix_test(*mesh2D, H1<1, 2>{}, H1<1, 2>{}, Dimension<2>{}); }
+//TEST(elasticity, 2D_quadratic_mat) { weak_form_matrix_test(*mesh2D, H1<2, 2>{}, H1<2, 2>{}, Dimension<2>{}); }
 
 // TEST(elasticity, 3D_linear) { weak_form_test(*mesh3D, H1<1, 3>{}, H1<1, 3>{}, Dimension<3>{}); }
 // TEST(elasticity, 3D_quadratic) { weak_form_test(*mesh3D, H1<2, 3>{}, H1<2, 3>{}, Dimension<3>{}); }
 // TEST(elasticity, 3D_cubic) { weak_form_test(*mesh3D, H1<3, 3>{}, H1<3, 3>{}, Dimension<3>{}); }
+
+// TEST(elasticity, 3D_linear_mat) { weak_form_matrix_test(*mesh3D, H1<1, 3>{}, H1<1, 3>{}, Dimension<3>{}); }
 
 int main(int argc, char* argv[])
 {
@@ -950,7 +976,7 @@ int main(int argc, char* argv[])
 
   // std::string meshfile2D = SERAC_REPO_DIR "/data/meshes/star.mesh";
   // mesh2D = mesh::refineAndDistribute(buildMeshFromFile(meshfile2D), serial_refinement, parallel_refinement);
-  mesh2D = mesh::refineAndDistribute(serac::buildRectangleMesh(1, 1), serial_refinement, parallel_refinement);
+  mesh2D = mesh::refineAndDistribute(serac::buildRectangleMesh(2, 1), serial_refinement, parallel_refinement);
 
   std::string meshfile3D = SERAC_REPO_DIR "/data/meshes/beam-hex.mesh";
   mesh3D = mesh::refineAndDistribute(buildMeshFromFile(meshfile3D), serial_refinement, parallel_refinement);
