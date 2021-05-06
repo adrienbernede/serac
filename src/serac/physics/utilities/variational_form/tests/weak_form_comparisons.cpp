@@ -603,7 +603,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p> test, H1<p> trial, Dimensi
   [[maybe_unused]] auto diff_integ = new DiffusionIntegrator(b_coef);
 
   // modify integration rule temporarily to match weak_form?
-  // A.AddDomainIntegrator(diff_integ);
+  A.AddDomainIntegrator(diff_integ);
   constexpr int skip_zeros = 0;
   A.Assemble(skip_zeros);
   A.Finalize();
@@ -761,8 +761,8 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
 
   ConstantCoefficient lambda_coef(b);
   ConstantCoefficient mu_coef(b);
-  // auto EI = new ElasticityIntegrator(lambda_coef, mu_coef);
-  // A.AddDomainIntegrator(EI);
+  auto EI = new ElasticityIntegrator(lambda_coef, mu_coef);
+  A.AddDomainIntegrator(EI);
   constexpr int skip_zeros = 0;
   A.Assemble(skip_zeros);
   A.Finalize();
@@ -798,7 +798,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
       Dimension<dim>{},
       [&](auto /*x*/, auto displacement) {
         auto [u, du_dx] = displacement;
-        auto f0         = a * u;  //+ I[0];
+        auto f0         = a * u + I[0];
         auto strain     = 0.5 * (du_dx + transpose(du_dx));
         auto f1         = b * tr(strain) * I + 2.0 * b * strain;
         return std::tuple{f0, f1};
@@ -943,7 +943,7 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
 // TEST(hcurl, 2D_quadratic) { weak_form_test(*mesh2D, Hcurl<2>{}, Hcurl<2>{}, Dimension<2>{}); }
 // TEST(hcurl, 2D_cubic) { weak_form_test(*mesh2D, Hcurl<3>{}, Hcurl<3>{}, Dimension<2>{}); }
 
-// TEST(hcurl, 2D_linear) { weak_form_test(*mesh2D, Hcurl<1>{}, Hcurl<1>{}, Dimension<2>{}); }
+// TEST(hcurl, 2D_linear_mat) { weak_form_matrix_test(*mesh2D, Hcurl<1>{}, Hcurl<1>{}, Dimension<2>{}); }
 
 // TEST(hcurl, 3D_linear) { weak_form_test(*mesh3D, Hcurl<1>{}, Hcurl<1>{}, Dimension<3>{}); }
 // TEST(hcurl, 3D_quadratic) { weak_form_test(*mesh3D, Hcurl<2>{}, Hcurl<2>{}, Dimension<3>{}); }
@@ -953,14 +953,15 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
 // TEST(elasticity, 2D_quadratic) { weak_form_test(*mesh2D, H1<2, 2>{}, H1<2, 2>{}, Dimension<2>{}); }
 // TEST(elasticity, 2D_cubic) { weak_form_test(*mesh2D, H1<3, 2>{}, H1<3, 2>{}, Dimension<2>{}); }
 
-//TEST(elasticity, 2D_linear_mat) { weak_form_matrix_test(*mesh2D, H1<1, 2>{}, H1<1, 2>{}, Dimension<2>{}); }
-//TEST(elasticity, 2D_quadratic_mat) { weak_form_matrix_test(*mesh2D, H1<2, 2>{}, H1<2, 2>{}, Dimension<2>{}); }
+// TEST(elasticity, 2D_linear_mat) { weak_form_matrix_test(*mesh2D, H1<1, 2>{}, H1<1, 2>{}, Dimension<2>{}); }
+// TEST(elasticity, 2D_quadratic_mat) { weak_form_matrix_test(*mesh2D, H1<2, 2>{}, H1<2, 2>{}, Dimension<2>{}); }
 
 // TEST(elasticity, 3D_linear) { weak_form_test(*mesh3D, H1<1, 3>{}, H1<1, 3>{}, Dimension<3>{}); }
 // TEST(elasticity, 3D_quadratic) { weak_form_test(*mesh3D, H1<2, 3>{}, H1<2, 3>{}, Dimension<3>{}); }
 // TEST(elasticity, 3D_cubic) { weak_form_test(*mesh3D, H1<3, 3>{}, H1<3, 3>{}, Dimension<3>{}); }
 
 // TEST(elasticity, 3D_linear_mat) { weak_form_matrix_test(*mesh3D, H1<1, 3>{}, H1<1, 3>{}, Dimension<3>{}); }
+// TEST(elasticity, 3D_quadratic_mat) { weak_form_matrix_test(*mesh3D, H1<2, 3>{}, H1<2, 3>{}, Dimension<3>{}); }
 
 int main(int argc, char* argv[])
 {
