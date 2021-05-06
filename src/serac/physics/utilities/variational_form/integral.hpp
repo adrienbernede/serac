@@ -402,7 +402,6 @@ void gradient_matrix_kernel(mfem::Vector& K_e, derivatives_type* derivatives_ptr
         // size(df0_du) = test_dim x trial_dim
         for_loop<test_ndof, test_dim, trial_ndof, trial_dim>([&](auto i, auto id, auto j, auto jd) {
           // maybe we should have a mapping for dofs x dim
-          // K_elem[i * test_dim + id][j * trial_dim + jd] += M[i] * df0_du[id][jd] * N[j] * dx;
           K_elem[i + test_ndof * id][j + trial_ndof * jd] += M[i] * df0_du[id][jd] * N[j] * dx;
         });
 
@@ -427,7 +426,6 @@ void gradient_matrix_kernel(mfem::Vector& K_e, derivatives_type* derivatives_ptr
             for_loop<test_ndof, trial_ndof, spatial_dim>([&](auto i, auto j, auto dummy_i) {
               // maybe we should have a mapping for dofs x dim
               K_elem[i * test_dim][j * trial_dim] += dM_dx[i][dummy_i] * df1_du[dummy_i] * N[j] * dx;
-              K_elem[i][j] += dM_dx[i][dummy_i] * df1_du[dummy_i] * N[j] * dx;
             });
           } else {
             for_loop<test_ndof, test_dim, trial_ndof, trial_dim, spatial_dim>(
