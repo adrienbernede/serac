@@ -669,6 +669,12 @@ constexpr auto operator*(const tensor<S, m>& A, const tensor<T, m, n>& B)
   return dot(A, B);
 }
 
+template <typename S, typename T, int m>
+constexpr auto operator*(const tensor<S, m>& A, const tensor<T, m>& B)
+{
+  return dot(A, B);
+}
+
 template <typename S, typename T, int m, int n>
 constexpr auto operator*(const tensor<S, m, n>& A, const tensor<T, n>& B)
 {

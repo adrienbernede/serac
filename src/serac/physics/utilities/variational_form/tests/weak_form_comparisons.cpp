@@ -44,9 +44,42 @@ template struct forbidden_restriction<&mfem::ElementRestriction::offsets, &mfem:
 
 namespace serac {
 namespace mfem_ext {
+
+    /**
+     Creates a CSR sparse matrix from element matrices assembled usign a mfem::ElementDofOrdering
+   */
 class AssembledSparseMatrix : public mfem::SparseMatrix {
 public:
+
+  /**
+   * @brief AssembledSparseMatrix creates a SparseMatrix based on finite element spaces and ElementDofOrdering
+   *
+   * @param[in] test Test finite element space
+   * @param[in] trial Trial finite element space
+   * @param[in] elem_order ElementDofOrdering chosen for both spaces
+   */
   AssembledSparseMatrix(const mfem::FiniteElementSpace& test,   // test_elem_dofs * ne * vdim x vdim * test_ndofs
+                        const mfem::FiniteElementSpace& trial,  // trial_elem_dofs * ne * vdim x vdim * trial_ndofs
+                        mfem::ElementDofOrdering        elem_order);
+
+  /// Updates SparseMatrix entries based on new element assembled matrices
+  virtual void FillData(const mfem::Vector& ea_data);
+
+protected:  
+  const mfem::FiniteElementSpace& test_fes;
+  const mfem::FiniteElementSpace& trial_fes;
+  // class local ElementRestriction objects
+  mfem::ElementRestriction        test_restriction;
+  mfem::ElementRestriction        trial_restriction;
+  mfem::ElementDofOrdering        elem_ordering;
+  mfem::Array<int>                ea_map;
+  
+private:
+  int  FillI();
+  void FillJ();
+
+};
+AssembledSparseMatrix::AssembledSparseMatrix(const mfem::FiniteElementSpace& test,   // test_elem_dofs * ne * vdim x vdim * test_ndofs
                         const mfem::FiniteElementSpace& trial,  // trial_elem_dofs * ne * vdim x vdim * trial_ndofs
                         mfem::ElementDofOrdering        elem_order)
       : mfem::SparseMatrix(test.GetNDofs() * test.GetVDim(), trial.GetNDofs() * trial.GetVDim()),
@@ -69,25 +102,15 @@ public:
     }
   }
 
-  int  FillI();
-  void FillJ();
-  void FillData(const mfem::Vector& ea_data);
-
-protected:
-  const mfem::FiniteElementSpace& test_fes;
-  const mfem::FiniteElementSpace& trial_fes;
-  mfem::ElementRestriction        test_restriction;
-  mfem::ElementRestriction        trial_restriction;
-  mfem::ElementDofOrdering        elem_ordering;
-  mfem::Array<int>                ea_map;
-};
-
 int AssembledSparseMatrix::FillI()
 {
-  [[maybe_unused]] auto& test_offsets = __get_offsets(test_restriction);  // offsets for rows.. each row is a test_vdof
-  [[maybe_unused]] auto& test_indices =
-      __get_indices(test_restriction);  // returns (test_elem_dof , ne) id corresponding to a test_vdof_offset
-  [[maybe_unused]] auto& test_gatherMap  = __get_gatherMap(test_restriction);  // returns test_vdof
+  // ElementRestriction creates a CSR matrix that maps vdof -> (dof, ne).
+  // offsets are the row offsets corresponding to a vdof
+  // indices maps a given vdof to the the assembled element matrix vector (dof * ne + d).
+  // gatherMap takes an element matrix vector offset (dof, ne) and returns the partition-local vdof (d.o.f. id).
+  [[maybe_unused]] auto& test_offsets = __get_offsets(test_restriction);
+  [[maybe_unused]] auto& test_indices = __get_indices(test_restriction);    
+  [[maybe_unused]] auto& test_gatherMap  = __get_gatherMap(test_restriction);
   [[maybe_unused]] auto& trial_offsets   = __get_offsets(trial_restriction);
   [[maybe_unused]] auto& trial_indices   = __get_indices(trial_restriction);
   [[maybe_unused]] auto& trial_gatherMap = __get_gatherMap(trial_restriction);
@@ -118,14 +141,18 @@ int AssembledSparseMatrix::FillI()
     trial_vdofs = -1;
     int nnz_row = 0;
     for (int e_index = 0; e_index < nrow_elems; e_index++) {
-      const int                  test_offset = test_indices[test_row_offset + e_index];
-      const int                  e           = test_offset / test_elem_dof;
-      [[maybe_unused]] const int test_i_elem = test_offset % test_elem_dof;
+      // test_indices can be negative in the case of Hcurl
+      const int                  test_index_v = test_indices[test_row_offset + e_index];
+      const int                  test_index = test_index_v >= 0 ? test_index_v : -test_index_v - 1;
+      const int                  e           = test_index / test_elem_dof;
+      [[maybe_unused]] const int test_i_elem = test_index % test_elem_dof;
 
       // find corresponding trial_vdofs
       mfem::Array<int> trial_elem_vdofs(trial_elem_dof);
       for (int j = 0; j < trial_elem_dof; j++) {
-        const auto trial_j_vdof = trial_gatherMap[trial_elem_dof * e + j];
+	// this might be negative
+        const auto trial_j_vdof_v = trial_gatherMap[trial_elem_dof * e + j];
+	const auto trial_j_vdof = trial_j_vdof_v >= 0 ? trial_j_vdof_v : -1 -trial_j_vdof_v;
         trial_elem_vdofs[j]     = trial_j_vdof;
         if (trial_vdofs.Find(trial_j_vdof) == -1) {
           // we haven't seen this before
@@ -137,7 +164,9 @@ int AssembledSparseMatrix::FillI()
 
     // add entries to I
     for (int vi = 0; vi < test_vdim; vi++) {
-      I[test_fes.DofToVDof(test_vdof, vi)] = nnz_row * trial_vdim;
+      const auto nnz_index_v = test_fes.DofToVDof(test_vdof, vi);
+      const auto nnz_index = nnz_index_v >= 0 ? nnz_index_v : -1 -nnz_index_v;
+      I[nnz_index] = nnz_row * trial_vdim;
     }
   }
 
@@ -158,14 +187,13 @@ void AssembledSparseMatrix::FillJ()
   auto I = ReadWriteI();
   auto J = WriteJ();
 
-  [[maybe_unused]] auto& test_offsets = __get_offsets(test_restriction);  // offsets for rows.. each row is a test_vdof
-  [[maybe_unused]] auto& test_indices =
-      __get_indices(test_restriction);  // returns (test_elem_dof , ne) id corresponding to a test_vdof_offset
-  [[maybe_unused]] auto& test_gatherMap  = __get_gatherMap(test_restriction);  // returns test_vdof
+  [[maybe_unused]] auto& test_offsets = __get_offsets(test_restriction);
+  [[maybe_unused]] auto& test_indices = __get_indices(test_restriction);    
+  [[maybe_unused]] auto& test_gatherMap  = __get_gatherMap(test_restriction);
   [[maybe_unused]] auto& trial_offsets   = __get_offsets(trial_restriction);
   [[maybe_unused]] auto& trial_indices   = __get_indices(trial_restriction);
   [[maybe_unused]] auto& trial_gatherMap = __get_gatherMap(trial_restriction);
-
+  
   const int                  test_elem_dof  = test_fes.GetFE(0)->GetDof();
   const int                  trial_elem_dof = trial_fes.GetFE(0)->GetDof();
   const int                  test_vdim      = test_fes.GetVDim();
@@ -194,16 +222,21 @@ void AssembledSparseMatrix::FillJ()
 
     // Build temporary array for assembled J
     for (int e_index = 0; e_index < nrow_elems; e_index++) {
-      const int                  test_offset = test_indices[test_row_offset + e_index];
-      const int                  e           = test_offset / test_elem_dof;
-      [[maybe_unused]] const int test_i_elem = test_offset % test_elem_dof;
+            // test_indices can be negative in the case of Hcurl
+      const int                  test_index_v = test_indices[test_row_offset + e_index];
+      const int                  test_index = test_index_v >= 0 ? test_index_v : -test_index_v - 1;
+      const int                  e           = test_index / test_elem_dof;
+      [[maybe_unused]] const int test_i_elem = test_index % test_elem_dof;
 
       // find corresponding trial_vdofs
       mfem::Array<int> trial_elem_vdofs(trial_elem_dof);
       for (int j_elem = 0; j_elem < trial_elem_dof; j_elem++) {
-        const auto trial_j_vdof  = trial_gatherMap[trial_elem_dof * e + j_elem];
+	// could be negative.. but trial_elem_vdofs is a temporary array
+        const auto trial_j_vdof_v  = trial_gatherMap[trial_elem_dof * e + j_elem];
+	const auto trial_j_vdof = trial_j_vdof_v >= 0 ? trial_j_vdof_v : -1 -trial_j_vdof_v;
         trial_elem_vdofs[j_elem] = trial_j_vdof;
 
+	// since trial_j_vdof could be negative but there are now two indices that point to the same dof (just oriented differently).. we only want to search for positive oriented indices
         auto find_index = trial_vdofs.Find(trial_j_vdof);
         if (find_index == -1) {
           // we haven't seen this before
@@ -217,7 +250,9 @@ void AssembledSparseMatrix::FillJ()
             for (int vj = 0; vj < trial_vdim; vj++) {
               const auto column_index = j_vdof_index + vj * nnz_row / trial_vdim;
               const auto j_nnz_index  = i_dof_offset + column_index;
-              J[j_nnz_index]          = trial_fes.DofToVDof(trial_vdofs[j_vdof_index], vj);
+	      // this index may be negative, but J needs to be positive
+	      const auto j_value = trial_fes.DofToVDof(trial_j_vdof_v, vj);
+              J[j_nnz_index]          = j_value >= 0 ? j_value : -1-j_value;
             }
           }
 
@@ -226,7 +261,11 @@ void AssembledSparseMatrix::FillJ()
             const auto i_dof_offset = I[test_fes.DofToVDof(test_vdof, vi)];
             for (int vj = 0; vj < trial_vdim; vj++) {
               const auto column_index = j_vdof_index + vj * nnz_row / trial_vdim;
-              map_ea(test_i_elem + test_elem_dof * vi, j_elem + trial_elem_dof * vj, e) = i_dof_offset + column_index;
+	      const int index_val = i_dof_offset + column_index;
+	      const int trial_index = trial_fes.DofToVDof(trial_j_vdof_v, vj);
+	      const int orientation_factor = (test_index_v >= 0 ? 1 : -1) * (trial_index >=0 ? 1 : -1);
+              map_ea(test_i_elem + test_elem_dof * vi, j_elem + trial_elem_dof * vj, e) =
+		orientation_factor > 0 ? index_val : -1-index_val;
             }
           }
 
@@ -238,7 +277,11 @@ void AssembledSparseMatrix::FillJ()
             const auto i_dof_offset = I[test_fes.DofToVDof(test_vdof, vi)];
             for (int vj = 0; vj < trial_vdim; vj++) {
               const auto column_index = find_index + vj * nnz_row / trial_vdim;
-              map_ea(test_i_elem + test_elem_dof * vi, j_elem + trial_elem_dof * vj, e) = i_dof_offset + column_index;
+	      const int index_val = i_dof_offset + column_index;
+	      const int trial_index = trial_fes.DofToVDof(trial_j_vdof_v, vj);
+	      const int orientation_factor = (test_index_v >= 0 ? 1 : -1) * (trial_index >=0 ? 1 : -1);      
+              map_ea(test_i_elem + test_elem_dof * vi, j_elem + trial_elem_dof * vj, e) =
+		orientation_factor > 0 ? index_val : -1-index_val;
             }
           }
         }
@@ -250,14 +293,13 @@ void AssembledSparseMatrix::FillData(const mfem::Vector& ea_data)
 {
   auto Data = WriteData();
 
-  [[maybe_unused]] auto& test_offsets = __get_offsets(test_restriction);  // offsets for rows.. each row is a test_vdof
-  [[maybe_unused]] auto& test_indices =
-      __get_indices(test_restriction);  // returns (test_elem_dof , ne) id corresponding to a test_vdof_offset
-  [[maybe_unused]] auto& test_gatherMap  = __get_gatherMap(test_restriction);  // returns test_vdof
+  [[maybe_unused]] auto& test_offsets = __get_offsets(test_restriction);
+  [[maybe_unused]] auto& test_indices = __get_indices(test_restriction);    
+  [[maybe_unused]] auto& test_gatherMap  = __get_gatherMap(test_restriction);
   [[maybe_unused]] auto& trial_offsets   = __get_offsets(trial_restriction);
   [[maybe_unused]] auto& trial_indices   = __get_indices(trial_restriction);
   [[maybe_unused]] auto& trial_gatherMap = __get_gatherMap(trial_restriction);
-
+  
   const int                  test_elem_dof  = test_fes.GetFE(0)->GetDof();
   const int                  trial_elem_dof = trial_fes.GetFE(0)->GetDof();
   const int                  test_vdim      = test_fes.GetVDim();
@@ -276,7 +318,9 @@ void AssembledSparseMatrix::FillData(const mfem::Vector& ea_data)
       for (int vi = 0; vi < test_vdim; vi++) {
         for (int j_elem = 0; j_elem < trial_elem_dof; j_elem++) {
           for (int vj = 0; vj < trial_vdim; vj++) {
-            Data[map_ea(i_elem + vi * test_elem_dof, j_elem + vj * trial_elem_dof, e)] +=
+	    const auto map_ea_v = map_ea(i_elem + vi * test_elem_dof, j_elem + vj * trial_elem_dof, e);
+	    const auto map_ea_index = map_ea_v >= 0 ? map_ea_v : -1 -map_ea_v;
+            Data[map_ea_index] += (map_ea_v >= 0 ? 1 : -1) * 
                 mat_ea(i_elem + vi * test_elem_dof, j_elem + vj * trial_elem_dof, e);
           }
         }
@@ -851,15 +895,15 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, H1<p, dim> test, H1<p, dim> tria
 
   for (int r = 0; r < A_spmat_mfem.Height(); r++) {
     auto columns = A_spmat_mfem.GetRowColumns(r);
-    std::cout << "row " << r << " : " << A_spmat_mfem.RowSize(r) << std::endl;
+    // std::cout << "row " << r << " : " << A_spmat_mfem.RowSize(r) << std::endl;
     for (int c = 0; c < A_spmat_mfem.RowSize(r); c++) {
       EXPECT_NEAR(A_spmat_mfem(r, columns[c]), A_serac_mat(r, columns[c]), 1.e-10);
     }
   }
 
-  A_serac_mat.Print();
+  //  A_serac_mat.Print();
 
-  A_spmat_mfem.Print();
+  //   A_spmat_mfem.Print();
 }
 
 template <int p, int dim>
@@ -942,23 +986,33 @@ void weak_form_matrix_test(mfem::ParMesh& mesh, Hcurl<p> test, Hcurl<p> trial, D
 
   Array<int> dofs;
   fespace.GetElementDofs(0, dofs);
-  mfem::Vector K_e(mesh.GetNE() * dofs.Size() * fespace.GetVDim() * dofs.Size() * fespace.GetVDim());
+
+  Vector K_e(fespace.GetFE(0)->GetDof() * fespace.GetFE(0)->GetDim() *
+	     fespace.GetFE(0)->GetDof() * fespace.GetFE(0)->GetDim() *
+	     fespace.GetNE());
   K_e = 0.;
+  
   residual.GradientMatrix(K_e);
   std::cout << "K_e: (" << K_e.Size() << ")" << std::endl << std::endl;
 
   serac::mfem_ext::AssembledSparseMatrix B_serac_mat(fespace, fespace, mfem::ElementDofOrdering::LEXICOGRAPHIC);
+   DenseTensor B_elem_mat;
+   B_elem_mat.UseExternalData(K_e.GetData(),
+			      fespace.GetFE(0)->GetDof() * fespace.GetFE(0)->GetDim(),
+			      fespace.GetFE(0)->GetDof() * fespace.GetFE(0)->GetDim(),
+			      fespace.GetNE());
   B_serac_mat.FillData(K_e);
   B_serac_mat.Finalize();
 
-  for (int r = 0; r < B_spmat_mfem.Height(); r++) {
-    auto columns = B_spmat_mfem.GetRowColumns(r);
-    std::cout << "row " << r << " : " << B_spmat_mfem.RowSize(r) << std::endl;
-    for (int c = 0; c < B_spmat_mfem.RowSize(r); c++) {
-      EXPECT_NEAR(B_spmat_mfem(r, columns[c]), B_serac_mat(r, columns[c]), 1.e-10);
+  for (int r = 0; r < B_serac_mat.Height(); r++) {
+    auto columns = B_serac_mat.GetRowColumns(r);
+    for (int c = 0; c < B_serac_mat.RowSize(r); c++) {
+      const int column_ind = columns[c]  >= 0 ? columns[c] : -1-columns[c];
+      EXPECT_NEAR(B_spmat_mfem(r, column_ind), B_serac_mat(r, column_ind), 1.e-10);
     }
+     
   }
-
+  
   B_serac_mat.Print();
 
   B_spmat_mfem.Print();
@@ -989,6 +1043,8 @@ TEST(thermal, 3D_linear_mat) { weak_form_matrix_test(*mesh3D, H1<1>{}, H1<1>{}, 
 // TEST(hcurl, 3D_linear) { weak_form_test(*mesh3D, Hcurl<1>{}, Hcurl<1>{}, Dimension<3>{}); }
 // TEST(hcurl, 3D_quadratic) { weak_form_test(*mesh3D, Hcurl<2>{}, Hcurl<2>{}, Dimension<3>{}); }
 // TEST(hcurl, 3D_cubic) { weak_form_test(*mesh3D, Hcurl<3>{}, Hcurl<3>{}, Dimension<3>{}); }
+
+TEST(hcurl, 3D_linear_mat) { weak_form_matrix_test(*mesh3D, Hcurl<1>{}, Hcurl<1>{}, Dimension<3>{}); }
 
 // TEST(elasticity, 2D_linear) { weak_form_test(*mesh2D, H1<1, 2>{}, H1<1, 2>{}, Dimension<2>{}); }
 // TEST(elasticity, 2D_quadratic) { weak_form_test(*mesh2D, H1<2, 2>{}, H1<2, 2>{}, Dimension<2>{}); }
@@ -1021,7 +1077,9 @@ int main(int argc, char* argv[])
   mesh2D = mesh::refineAndDistribute(serac::buildRectangleMesh(2, 1), serial_refinement, parallel_refinement);
 
   std::string meshfile3D = SERAC_REPO_DIR "/data/meshes/beam-hex.mesh";
-  mesh3D = mesh::refineAndDistribute(buildMeshFromFile(meshfile3D), serial_refinement, parallel_refinement);
+  // mesh3D = mesh::refineAndDistribute(buildMeshFromFile(meshfile3D), serial_refinement, parallel_refinement);
+
+  mesh3D = mesh::refineAndDistribute(buildCuboidMesh(1,1,1), serial_refinement, parallel_refinement);
 
   int result = RUN_ALL_TESTS();
 
