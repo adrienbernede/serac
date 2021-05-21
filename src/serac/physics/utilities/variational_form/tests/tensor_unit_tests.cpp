@@ -1,5 +1,6 @@
 #include "serac/physics/utilities/variational_form/detail/metaprogramming.hpp"
 #include "serac/physics/utilities/variational_form/tensor.hpp"
+#include "serac/physics/utilities/variational_form/polynomials.hpp"
 
 using namespace serac;
 
@@ -116,4 +117,32 @@ int main()
   basic_tensor_tests();
   elasticity_tests();
   navier_stokes_tests();
+
+  {
+  constexpr int n = 2;
+  auto points = GaussLegendreNodes<n>();
+  std::cout << GaussLegendreInterpolation<n>(points[0]) << std::endl;
+  std::cout << GaussLegendreInterpolation<n>(points[1]) << std::endl;
+  std::cout << points << std::endl;
+  }
+
+  {
+  constexpr int n = 3;
+  auto points = GaussLegendreNodes<n>();
+  std::cout << GaussLegendreInterpolation<n>(points[0]) << std::endl;
+  std::cout << GaussLegendreInterpolation<n>(points[1]) << std::endl;
+  std::cout << GaussLegendreInterpolation<n>(points[2]) << std::endl;
+  std::cout << points << std::endl;
+  }
+
+  {
+  constexpr int n = 4;
+  auto points = GaussLegendreNodes<n>();
+  std::cout << GaussLegendreInterpolation<n>(points[0]) << std::endl;
+  std::cout << GaussLegendreInterpolation<n>(points[1]) << std::endl;
+  std::cout << GaussLegendreInterpolation<n>(points[2]) << std::endl;
+  std::cout << GaussLegendreInterpolation<n>(points[3]) << std::endl;
+  std::cout << points << std::endl;
+  }
+
 }

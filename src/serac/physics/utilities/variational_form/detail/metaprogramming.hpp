@@ -83,7 +83,7 @@ namespace detail {
 // 1 1
 // 1 2
 // 
-// latter integer template parameters correspond to more nested loops
+// latter integer template parameters correspond to the more deeply-nested loops
 // 
 // The lambda function should be a callable object taking sizeof ... (n) arguments.
 // Anything returned from f() will be discarded
