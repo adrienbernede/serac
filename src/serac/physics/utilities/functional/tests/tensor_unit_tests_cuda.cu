@@ -50,8 +50,7 @@ __global__ void basic_tensor_tests() {
 
 }
 
-#if 0
-void elasticity_tests() {
+__global__ void elasticity_tests() {
   static constexpr auto abs = [](auto x) { return (x < 0) ? -x : x; };
 
   static constexpr double lambda = 5.0;
@@ -74,7 +73,7 @@ void elasticity_tests() {
   for_constexpr<3, 3>([&](auto i, auto j) { static_assert(abs(sqnorm(C[i][j] - stress[i][j].gradient)) < 1.0e-16); });
 }
 
-void navier_stokes_tests()
+__global__ void navier_stokes_tests()
 {
   [[maybe_unused]] static constexpr auto abs = [](auto x) { return (x < 0) ? -x : x; };
 
@@ -96,7 +95,7 @@ void navier_stokes_tests()
 
   constexpr double p = 3.14;
   constexpr tensor v = {{1.0, 2.0, 3.0}};
-  constexpr tensor L = {{{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}}};
+  constexpr tensor<double,3,3> L = {{{1.0, 2.0, 3.0}, {4.0, 5.0, 6.0}, {7.0, 8.0, 9.0}}};
 
   {
     [[maybe_unused]] static constexpr auto exact = dsigma_dp(p, v, L);
@@ -119,11 +118,10 @@ void navier_stokes_tests()
     for_constexpr<3, 3>([&](auto i, auto j) { static_assert(abs(sqnorm(exact[i][j] - ad[i][j].gradient)) < 1.0e-16); });
   }
 }
-#endif
 
 int main()
 {
   basic_tensor_tests<<<1,1>>>();
-  //elasticity_tests();
-  //navier_stokes_tests();
+  elasticity_tests<<<1,1>>>();
+  navier_stokes_tests<<<1,1>>>();
 }
